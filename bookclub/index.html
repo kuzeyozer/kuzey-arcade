@@ -138,6 +138,11 @@ footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
 .voice b{display:block}
 .voice p{margin:4px 0 0;white-space:pre-wrap}
 .avg{font-size:15px}
+.switch{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.clubpick{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:10px 12px;cursor:pointer;min-width:0}
+.clubpick b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clubpick span{font-size:13px;color:var(--mute)}
+.clubpick[aria-pressed="true"]{border-color:var(--club);box-shadow:0 0 0 2px var(--club) inset}
 details summary{cursor:pointer;color:var(--mute);font-size:14px}
 button[disabled],input[disabled]{opacity:.55;cursor:not-allowed}
 </style>
@@ -172,7 +177,7 @@ button[disabled],input[disabled]{opacity:.55;cursor:not-allowed}
     <div class="grid" id="resGrid"></div>
   </div>
 </main>
-<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). <span id="where">Your shelf, notes and ratings stay on this device.</span> <span id="ver">Version 7</span></footer>
+<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). <span id="where">Your shelf, notes and ratings stay on this device.</span> <span id="ver">Version 8</span></footer>
 
 <div class="sheet" id="clubSheet" hidden role="dialog" aria-modal="true" aria-label="Book club">
   <div class="top"><div class="wrap"><button class="back" id="clubBack">‹ Back</button></div></div>
@@ -203,11 +208,26 @@ const saveSummaries=()=>{try{localStorage.setItem('bookClubSummaries',JSON.strin
 /* ---------- the shared club ---------- */
 // The club lives in one record on a free storage service. Its id is the club code.
 const API='https://api.restful-api.dev/objects/',KIND='kuzey-bookclub';
-let member=null;try{member=JSON.parse(localStorage.getItem('bookClubMember')||'null')}catch(e){}
-let club=null;try{club=member?JSON.parse(localStorage.getItem('bookClubCache')||'null'):null}catch(e){}
+// every club this device is in, and which one is showing (none = your own shelf)
+let clubs=[];try{clubs=JSON.parse(localStorage.getItem('bookClubClubs')||'[]');if(!Array.isArray(clubs))clubs=[]}catch(e){clubs=[]}
+clubs=clubs.filter(c=>c&&typeof c.id==='string'&&typeof c.mid==='string');
+let active=null;try{active=localStorage.getItem('bookClubActive')}catch(e){}
+try{ // move a club saved by Version 7, which kept only one
+  const old=JSON.parse(localStorage.getItem('bookClubMember')||'null');
+  if(old&&old.id){if(!clubs.some(c=>c.id===old.id)){clubs.push(old);const c=localStorage.getItem('bookClubCache');if(c)localStorage.setItem('bookClubCache:'+old.id,c)}active=old.id}
+}catch(e){}
+const loadCache=id=>{try{return JSON.parse(localStorage.getItem('bookClubCache:'+id)||'null')}catch(e){return null}};
+let member=clubs.find(c=>c.id===active)||null;
+let club=member?loadCache(member.id):null;
+let showForms=false;
 let isHost=false,lastSync=0,syncMsg='';
-const saveMember=()=>{try{member?localStorage.setItem('bookClubMember',JSON.stringify(member)):localStorage.removeItem('bookClubMember')}catch(e){}};
-const saveCache=()=>{try{club?localStorage.setItem('bookClubCache',JSON.stringify(club)):localStorage.removeItem('bookClubCache')}catch(e){}};
+const saveMember=()=>{
+  if(member){const i=clubs.findIndex(c=>c.id===member.id);if(i>=0)clubs[i]=member;else clubs.push(member)}
+  try{localStorage.setItem('bookClubClubs',JSON.stringify(clubs));localStorage.setItem('bookClubActive',member?member.id:'');localStorage.removeItem('bookClubMember');localStorage.removeItem('bookClubCache')}catch(e){}
+};
+const saveCache=()=>{if(!(member&&club))return;member.name=String(club.clubName||'').slice(0,40);
+  try{localStorage.setItem('bookClubCache:'+member.id,JSON.stringify(club))}catch(e){}saveMember()};
+saveMember();
 const hex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,'0')).join('');
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 const fmtCode=id=>String(id).toUpperCase().match(/.{1,4}/g).join('-');
@@ -278,12 +298,24 @@ async function joinClub(code,nick,hostKey){
   const d=await readClub(code);
   if(hostKey&&d.hostHash!==await sha(hostKey))throw new ClubError('hostkey');
   // same nickname on another device: carry on as that person
-  let mid=hostKey?d.hostMid:null;
+  const known=clubs.find(c=>c.id===code);
+  if(known&&(!hostKey||known.hostKey===hostKey)){await switchClub(code);return}
+  let mid=hostKey?d.hostMid:(known?known.mid:null);
   if(!mid)for(const [k,m] of Object.entries(d.members))if(String(obj(m).nick||'').toLowerCase()===nick.toLowerCase())mid=k;
-  member={id:code,mid:mid||hex(6),nick,hostKey:hostKey||null};saveMember();
-  await push(x=>{const m=x.members[member.mid]=obj(x.members[member.mid]);m.nick=nick;m.ratings=obj(m.ratings);m.notes=obj(m.notes)});
+  const prev=member,prevClub=club,before=clubs.slice();
+  member={id:code,mid:mid||hex(6),nick,hostKey:hostKey||(known&&known.hostKey)||null};club=d;
+  try{await push(x=>{const m=x.members[member.mid]=obj(x.members[member.mid]);m.nick=nick;m.ratings=obj(m.ratings);m.notes=obj(m.notes)})}
+  catch(e){clubs=before;member=prev;club=prevClub;saveMember();await applyClub();throw e}
 }
-function leaveClub(){member=null;club=null;saveMember();saveCache();applyClub();renderClubSheet()}
+async function switchClub(id){
+  flushNotes&&flushNotes();
+  member=clubs.find(c=>c.id===id)||null;club=member?loadCache(member.id):null;lastSync=0;syncMsg='';showForms=false;
+  saveMember();await applyClub();if(member)pull();
+}
+function leaveClub(){
+  const id=member.id;clubs=clubs.filter(c=>c.id!==id);try{localStorage.removeItem('bookClubCache:'+id)}catch(e){}
+  member=null;club=null;saveMember();switchClub(clubs[0]?clubs[0].id:null);
+}
 async function change(kind,value,info){
   if(['shelf','pick','meet'].includes(kind)&&!isHost)throw new ClubError('host');
   await push(d=>{
@@ -498,7 +530,8 @@ function renderClubBar(){
   $('where').textContent=member&&club?'Your club is shared online with everyone who has its code.':'Your shelf, notes and ratings stay on this device.';
   if(member&&club){btn.querySelector('b').textContent=String(club.clubName||'Our book club').slice(0,40);
     $('clubSub').textContent=(isHost?'You\'re the host':'You\'re a member')+' as '+member.nick+(syncMsg?' · '+syncMsg:lastSync?' · updated '+ago(lastSync):'');
-    btn.querySelector('.go').textContent='Club';}
+    btn.querySelector('.go').textContent=clubs.length>1?'Switch':'Club';}
+  else if(clubs.length){btn.querySelector('b').textContent='My own shelf';$('clubSub').textContent='You\'re in '+clubs.length+' club'+(clubs.length>1?'s':'')+'. Tap to switch.';btn.querySelector('.go').textContent='Switch'}
   else{btn.querySelector('b').textContent='Start or join a book club';$('clubSub').textContent='Share one shelf with your friends';btn.querySelector('.go').textContent='Open'}
 }
 function copy(text,btn){
@@ -506,11 +539,22 @@ function copy(text,btn){
   try{navigator.clipboard.writeText(text).then(done,()=>prompt('Copy this:',text))}catch(e){prompt('Copy this:',text)}
 }
 let prefill='';
+function switcherHTML(){
+  if(!clubs.length)return'';
+  return `<div class="panel"><h3>Your clubs</h3><div class="switch">${clubs.map(c=>`<button class="clubpick" data-id="${esc(c.id)}" aria-pressed="${!!(member&&member.id===c.id)}"><b>${esc(c.name||'Club '+fmtCode(c.id).slice(0,9))}</b><span>${c.hostKey?'Host':'Member'} as ${esc(String(c.nick||'').slice(0,20))}</span></button>`).join('')}
+    <button class="clubpick" data-id="" aria-pressed="${!member}"><b>My own shelf</b><span>Just for this device</span></button></div>
+    ${member&&club&&!showForms?'<div class="row"><button class="btn quiet small" id="another">Join or start another club</button></div>':''}</div>`;
+}
+function bindSwitcher(){
+  $('clubBody').querySelectorAll('.clubpick').forEach(x=>x.onclick=()=>{if(x.getAttribute('aria-pressed')!=='true')switchClub(x.dataset.id||null)});
+  if($('another'))$('another').onclick=()=>{showForms=true;renderClubSheet()};
+  if($('cancelForms'))$('cancelForms').onclick=()=>{showForms=false;prefill='';renderClubSheet()};
+}
 function renderClubSheet(){
   const b=$('clubBody');
-  if(!(member&&club)){
+  if(!(member&&club)||showForms){
     const nick=String((member&&member.nick)||localStorage.getItem('bookClubNick')||'');
-    b.innerHTML=`<div><h2>Book club</h2><p class="mute">Start a club and share its code. Everyone who joins sees the same shelf, club pick and meeting date. Only the host can change those. Everyone can rate books and write notes, and the whole club can see them.</p></div>
+    b.innerHTML=switcherHTML()+`<div><h2>${clubs.length?'Join or start another club':'Book club'}</h2><p class="mute">Start a club and share its code. Everyone who joins sees the same shelf, club pick and meeting date. Only the host can change those. Everyone can rate books and write notes, and the whole club can see them.</p></div>
       <div class="panel"><h3>Join a club</h3>
         <label class="field">Club code<input id="jCode" autocomplete="off" autocapitalize="characters" placeholder="Paste the code or invite link" value="${esc(prefill)}"></label>
         <label class="field">Your nickname<input id="jNick" maxlength="20" autocomplete="nickname" value="${esc(nick)}"></label>
@@ -519,26 +563,27 @@ function renderClubSheet(){
       <div class="panel"><h3>Start a new club</h3>
         <label class="field">Club name<input id="cName" maxlength="40" placeholder="Kuzey's Book Club"></label>
         <label class="field">Your nickname<input id="cNick" maxlength="20" autocomplete="nickname" value="${esc(nick)}"></label>
-        <p class="lock">You'll be the host. Books already on your shelf move into the new club.</p>
+        <p class="lock">You'll be the host. Books on your own shelf are copied into the new club.</p>
         <div class="row"><button class="btn" id="cGo">Start the club</button></div></div>
       <p class="err" id="clubErr" hidden></p>
-      <p class="lock">The club is kept on a free online storage service. Anyone who has the code can see it, so don't write anything private.</p>`;
+      <p class="lock">The club is kept on a free online storage service. Anyone who has the code can see it, so don't write anything private.</p>
+      ${member&&club?'<div class="row"><button class="btn quiet" id="cancelForms">Cancel</button></div>':''}`;
+    bindSwitcher();
     const fail=e=>{$('clubErr').hidden=false;$('clubErr').textContent=e.message&&ERR[e.message]?ERR[e.message]:e.message||ERR.server};
     const busy=(btn,on,label)=>{btn.disabled=on;if(label)btn.textContent=label};
     $('jGo').onclick=async()=>{const code=parseCode($('jCode').value),nick=$('jNick').value.trim().slice(0,20),key=($('jKey').value||'').trim();
       if(!code)return fail(new Error('Paste the club code or invite link first. It looks like FF80-8181-…'));
       if(!nick)return fail(new Error('Type a nickname so the club knows who you are.'));
       try{localStorage.setItem('bookClubNick',nick)}catch(e){}
-      busy($('jGo'),true,'Joining…');try{await joinClub(code,nick,key);prefill=''}catch(e){member=null;saveMember();fail(e);busy($('jGo'),false,'Join the club')}};
+      busy($('jGo'),true,'Joining…');try{await joinClub(code,nick,key);prefill='';showForms=false;renderClubSheet()}catch(e){fail(e);busy($('jGo'),false,'Join the club')}};
     $('cGo').onclick=async()=>{const name=$('cName').value.trim().slice(0,40)||'Our Book Club',nick=$('cNick').value.trim().slice(0,20);
       if(!nick)return fail(new Error('Type a nickname so the club knows who you are.'));
       try{localStorage.setItem('bookClubNick',nick)}catch(e){}
-      busy($('cGo'),true,'Starting…');try{await startClub(name,nick)}catch(e){fail(e);busy($('cGo'),false,'Start the club')}};
+      busy($('cGo'),true,'Starting…');try{await startClub(name,nick);showForms=false;renderClubSheet()}catch(e){fail(e);busy($('cGo'),false,'Start the club')}};
     return;
   }
   const ps=people();
-  const other=prefill&&parseCode(prefill)!==member.id;
-  b.innerHTML=`${other?`<p class="err">You opened an invite to a different club (${esc(prefill)}). To join it, leave this club first, then open the invite again.</p>`:''}<div><h2>${esc(String(club.clubName||'Our book club').slice(0,40))}</h2>
+  b.innerHTML=switcherHTML()+`<div><h2>${esc(String(club.clubName||'Our book club').slice(0,40))}</h2>
       <p class="mute">You're ${isHost?'<b>the host</b>':'a member'} as <b>${esc(member.nick)}</b>. ${syncMsg?esc(syncMsg):lastSync?'Updated '+ago(lastSync)+'.':''}</p></div>
     <div class="panel"><h3>Invite people</h3>
       <div class="codebox" id="codeBox">${esc(fmtCode(member.id))}</div>
@@ -550,7 +595,8 @@ function renderClubSheet(){
     <div class="panel"><h3>Members (${ps.length})</h3>
       <ul class="members">${ps.map(p=>`<li>${esc(p.nick)}${p.host?' <span class="tag">Host</span>':''}${p.mid===member.mid?' <span class="mute small">(you)</span>':''}</li>`).join('')}</ul></div>
     <div class="row"><button class="btn quiet" id="refresh">Check for updates</button><button class="btn quiet" id="leave">Leave this club on this device</button></div>
-    <p class="lock">Leaving only removes the club from this device. You can join again any time with the code${isHost?' and your host key':''}.</p>`;
+    <p class="lock">Leaving only removes this club from this device. You can join again any time with the code${isHost?' and your host key':''}.</p>`;
+  bindSwitcher();
   $('cpLink').onclick=e=>copy(inviteLink(),e.target);$('cpCode').onclick=e=>copy(fmtCode(member.id),e.target);
   if(isHost)$('cpKey').onclick=e=>copy(member.hostKey,e.target);
   $('refresh').onclick=()=>pull();
@@ -589,8 +635,8 @@ function checkInvite(){
   const inv=location.hash.startsWith('#join=')?parseCode(location.hash):null;
   if(!inv)return;
   history.replaceState(null,'',location.pathname);
-  if(member&&member.id===inv){openClub();return} // already in this club
-  prefill=fmtCode(inv);openClub();
+  if(clubs.some(c=>c.id===inv)){switchClub(inv).then(openClub);return} // already in that club
+  prefill=fmtCode(inv);showForms=true;openClub();
 }
 checkInvite();addEventListener('hashchange',checkInvite);
 // check again when coming back to the app, at most every 2 minutes
