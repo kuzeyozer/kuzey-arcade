@@ -145,7 +145,7 @@ footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
     <div class="grid" id="resGrid"></div>
   </div>
 </main>
-<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). Your shelf, notes and ratings stay on this device.</footer>
+<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). Your shelf, notes and ratings stay on this device. <span id="ver">Version 6</span></footer>
 
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="bTitle">
   <div class="top"><div class="wrap"><button class="back" id="back">‹ Back</button></div></div>
@@ -336,7 +336,12 @@ function renderHome(){
 }
 IDEAS.forEach(t=>{const c=document.createElement('button');c.className='chip';c.textContent=t;c.onclick=()=>{$('q').value=t;search(t)};$('ideas').appendChild(c)});
 renderHome();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator){
+  // when a new version takes over, reload once so it shows straight away
+  let reloaded=false;const had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded){reloaded=true;location.reload()}});
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
+}
 })();
 </script>
 </body>
