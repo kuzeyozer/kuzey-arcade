@@ -282,8 +282,18 @@ async function loadSummary(book){
   let s=await wikiSummary(book.title);if(s)s.source='Wikipedia';else s=await olDescription(id);
   if(s){if(db.books[id]){db.books[id].summary=s;save()}put(s)}else if(!cached)put(null);
 }
-function renderRead(book){
+async function renderRead(book){
   const box=$('readBox'),id=book.id;
+  if(book.access===undefined){ // saved before the app knew about free copies: look it up
+    box.innerHTML='<p class="mute small">Looking for a free copy…</p>';
+    try{const r=await fetch('https://openlibrary.org/search.json?q='+encodeURIComponent('key:/works/'+id)+'&limit=1&fields=ebook_access,ia,lending_edition_s,id_project_gutenberg');
+      const d=((await r.json()).docs||[])[0]||{};
+      book.access=d.ebook_access||'no_ebook';book.ia=(d.ia||[])[0]||null;book.lend=d.lending_edition_s||null;
+      book.gid=(d.id_project_gutenberg||[]).map(Number).filter(n=>n>0).sort((x,y)=>x-y).map(String)[0]||null;
+      if(db.books[id])Object.assign(db.books[id].book,{access:book.access,ia:book.ia,lend:book.lend,gid:book.gid}),save();
+    }catch(e){book.access='no_ebook'}
+    if(openId!==id)return;
+  }
   const draw=gid=>{
     if(openId!==id)return;
     const btns=[];
