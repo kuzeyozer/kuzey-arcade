@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kuzey Arcade">
+<title>Kuzey Arcade</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Chakra+Petch:wght@400;600&display=swap">
+<style>
+/* Layout: a console home screen. Big title, two game cartridges side by side, install help underneath. */
+:root{--night:#0b0820;--panel:#151036;--line:#2c2468;--ink:#ecebff;--mute:#9a94c9;--cyan:#3ef0ff;--pink:#ff3d9a;--gold:#ffd23f;
+  --display:'Orbitron',ui-monospace,monospace;--body:'Chakra Petch',system-ui,sans-serif;color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,#24186a 0%,var(--night) 60%) fixed,var(--night);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:900px;margin:0 auto;padding-block:40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vw,64px);line-height:1;margin:0;letter-spacing:.04em;
+  background:linear-gradient(90deg,var(--cyan),var(--pink) 60%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mute);margin:8px 0 0}
+.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.game{display:flex;flex-direction:column;text-decoration:none;color:inherit;background:var(--panel);border:2px solid var(--line);border-radius:14px;overflow:hidden;transition:transform .15s,border-color .15s}
+.game:hover,.game:focus-visible{transform:translateY(-3px);border-color:var(--acc);outline:none}
+.game canvas{width:100%;aspect-ratio:16/9;display:block;image-rendering:pixelated}
+.game .info{padding:16px;display:flex;flex-direction:column;gap:6px}
+.game h2{font-family:var(--display);font-weight:900;font-size:20px;margin:0;color:var(--acc)}
+.game p{margin:0;color:var(--mute);font-size:15px}
+.game .play{margin-top:8px;align-self:flex-start;font-family:var(--display);font-weight:900;font-size:13px;letter-spacing:.1em;background:var(--acc);color:var(--night);padding:8px 16px;border-radius:6px}
+.help{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.help h2{font-family:var(--display);font-size:14px;letter-spacing:.12em;margin:0;color:var(--mute)}
+.help ol{margin:0;padding-left:20px;color:var(--mute)}
+.help b{color:var(--ink)}
+.installed{color:var(--cyan)}
+@media (prefers-reduced-motion:reduce){.game{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>KUZEY ARCADE</h1>
+    <p class="sub">Two games, made with Claude. They work offline once you've opened them.</p>
+  </header>
+
+  <div class="games">
+    <a class="game" href="snake.html" style="--acc:var(--cyan)">
+      <canvas id="c1" width="160" height="90" aria-hidden="true"></canvas>
+      <div class="info"><h2>Neon Snake Rush</h2><p>Combos, gold food, portals and power-ups. How long can you get?</p><span class="play">PLAY</span></div>
+    </a>
+    <a class="game" href="temples.html" style="--acc:var(--gold)">
+      <canvas id="c2" width="160" height="90" aria-hidden="true"></canvas>
+      <div class="info"><h2>Five Temples</h2><p>Pick an element and fight five temple bosses from the Elementals mod.</p><span class="play">PLAY</span></div>
+    </a>
+  </div>
+
+  <div class="help" id="help">
+    <h2>PUT IT ON YOUR HOME SCREEN</h2>
+    <ol>
+      <li><b>iPhone or iPad:</b> open this page in Safari, tap the Share button, then <b>Add to Home Screen</b>.</li>
+      <li><b>Android:</b> open it in Chrome, tap the ⋮ menu, then <b>Add to Home screen</b> or <b>Install app</b>.</li>
+      <li><b>Computer:</b> in Chrome or Edge, click the install icon at the right end of the address bar.</li>
+    </ol>
+  </div>
+</div>
+<script>
+// tiny animated previews
+const c1=document.getElementById('c1').getContext('2d'),c2=document.getElementById('c2').getContext('2d');
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function snake(t){const x=c1;x.fillStyle='#0b0820';x.fillRect(0,0,160,90);x.strokeStyle='#1d1748';x.beginPath();for(let i=0;i<=160;i+=10){x.moveTo(i+.5,0);x.lineTo(i+.5,90)}for(let j=0;j<=90;j+=10){x.moveTo(0,j+.5);x.lineTo(160,j+.5)}x.stroke();
+  const n=12,step=Math.floor(t/140);for(let i=0;i<n;i++){const k=(step-i+400)%32,px=k<16?k:31-k,py=k<16?3:5;x.globalAlpha=1-i/n*.6;x.fillStyle='#3ef0ff';x.shadowColor='#3ef0ff';x.shadowBlur=i?3:8;x.fillRect(px*10+1,py*10+1,8,8)}
+  x.globalAlpha=1;x.shadowBlur=8;x.shadowColor='#ff3d9a';x.fillStyle='#ff3d9a';x.fillRect(121,61,8,8);x.shadowColor='#ffd23f';x.fillStyle='#ffd23f';x.fillRect(31,71,8,8);x.shadowBlur=0}
+const B=["F..F.FF.F..F",".F.FFFFFF.F.","..YYYYYYYY..",".YRRRRRRRRY.",".RREERREERR.",".RRRRRRRRRR.",".RRMMMMMMRR.","..RRRRRRRR..","F..RRRRRR..F",".F.F.RR.F.F.","F.F..RR..F.F","..F..FF..F.."],P={F:'#ff9a2e',Y:'#ffd23f',R:'#c8341c',E:'#fff3b0',M:'#3a0a06'};
+function temple(t){const x=c2;for(let j=0;j<9;j++)for(let i=0;i<16;i++){x.fillStyle=(i+j)%3?'#5a1e1e':'#652323';x.fillRect(i*10,j*10,10,10)}
+  const bob=still?0:Math.sin(t/300)*2;B.forEach((r,j)=>[...r].forEach((k,i)=>{if(P[k]){x.fillStyle=P[k];x.fillRect(80-18+i*3,20+j*3+bob,3,3)}}));
+  for(let i=0;i<8;i++){const a=t/700+i*.785;x.fillStyle='#ff9a2e';x.fillRect(80+Math.cos(a)*(30+((t/20)%40))-2,38+Math.sin(a)*(30+((t/20)%40))*.6-2,4,4)}
+  x.fillStyle='#bfe8ff';x.fillRect(76,72,8,10);x.fillStyle='#e7b48a';x.fillRect(77,68,6,5)}
+function loop(t){snake(t);temple(t);if(!still)requestAnimationFrame(loop)}requestAnimationFrame(loop);
+if(matchMedia('(display-mode: standalone)').matches||navigator.standalone){document.getElementById('help').innerHTML='<h2 class="installed">INSTALLED</h2><p class="sub" style="margin:0">Kuzey Arcade is on your home screen. Have fun!</p>'}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
