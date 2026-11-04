@@ -1,5 +1,5 @@
 // App shell from the cache; book searches and summaries from the network, cached for offline reading.
-const VERSION = 'bookclub-v3';
+const VERSION = 'bookclub-v4';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys()
@@ -10,7 +10,11 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const shell = url.origin === location.origin;
   if (shell) {
-    e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request)));
+    // newest version when online, saved copy when offline
+    e.respondWith(fetch(e.request).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
+      return res;
+    }).catch(() => caches.match(e.request).then(hit => hit || caches.match('index.html'))));
     return;
   }
   // network first, fall back to what we saw last time
