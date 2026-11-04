@@ -183,7 +183,7 @@ async function search(q){
     const r=await fetch('https://openlibrary.org/search.json?q='+encodeURIComponent(q)+'&limit=24&fields=key,title,author_name,first_publish_year,cover_i,number_of_pages_median,subject,ebook_access,ia,lending_edition_s,id_project_gutenberg',{signal:searchCtl.signal});
     if(!r.ok)throw new Error(r.status);
     const j=await r.json();
-    const list=(j.docs||[]).filter(d=>d.key&&d.title).map(d=>({id:d.key.replace('/works/',''),title:d.title,author:(d.author_name||[])[0]||'Unknown author',year:d.first_publish_year||null,cover:d.cover_i||null,pages:d.number_of_pages_median||null,subjects:(d.subject||[]).slice(0,8),access:d.ebook_access||'no_ebook',ia:(d.ia||[])[0]||null,lend:d.lending_edition_s||null,gid:(d.id_project_gutenberg||[])[0]||null}));
+    const list=(j.docs||[]).filter(d=>d.key&&d.title).map(d=>({id:d.key.replace('/works/',''),title:d.title,author:(d.author_name||[])[0]||'Unknown author',year:d.first_publish_year||null,cover:d.cover_i||null,pages:d.number_of_pages_median||null,subjects:(d.subject||[]).slice(0,8),access:d.ebook_access||'no_ebook',ia:(d.ia||[])[0]||null,lend:d.lending_edition_s||null,gid:(d.id_project_gutenberg||[]).map(Number).filter(n=>n>0).sort((x,y)=>x-y).map(String)[0]||null}));
     $('resStatus').textContent=list.length?list.length+' books found. Tap one for its summary.':'No books found. Check the spelling, or try the author\'s name.';
     $('resGrid').innerHTML='';list.forEach(b=>$('resGrid').appendChild(bookTile(b)));
   }catch(e){if(e.name==='AbortError')return;$('resStatus').textContent='The book search did not answer. Check your internet connection and try again.'}
