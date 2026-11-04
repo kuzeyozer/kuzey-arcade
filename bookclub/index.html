@@ -114,6 +114,32 @@ ol.qs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px}
 @keyframes sh{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}}
 footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
+.clubbar{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:var(--club-ink);border-radius:12px;padding:10px 14px;cursor:pointer;text-align:left;width:100%}
+.clubbar:hover{background:rgba(255,255,255,.16)}
+.clubbar b{font-weight:700}
+.clubbar span{opacity:.8;font-size:14px}
+.clubbar .go{margin-left:auto;font-weight:700;color:var(--brass);white-space:nowrap}
+.clubbar .dotc{width:10px;height:10px;border-radius:50%;background:var(--brass);flex:none}
+.clubbody{padding-block:24px 48px;display:flex;flex-direction:column;gap:16px;max-width:720px}
+.clubbody .panel{margin-top:0}
+.field{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--mute);font-weight:700}
+.field input{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--paper);color:var(--ink);font-weight:400;font-size:16px}
+.codebox{font-family:ui-monospace,Menlo,monospace;font-size:clamp(15px,3.6vw,20px);letter-spacing:.06em;background:var(--sunk);border-radius:10px;padding:12px 14px;word-break:break-all;color:var(--ink)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.members{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.members li{display:flex;align-items:center;gap:8px}
+.tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--brass-soft);color:var(--brass);padding:2px 8px;border-radius:999px}
+.err{color:var(--rose);font-size:14px;margin:0}
+.ok{color:var(--club);font-size:14px;margin:0}
+.lock{font-size:14px;color:var(--mute);margin:0}
+.voices{display:flex;flex-direction:column;gap:12px}
+.voice{border-top:1px solid var(--line);padding-top:10px}
+.voice:first-child{border-top:0;padding-top:0}
+.voice b{display:block}
+.voice p{margin:4px 0 0;white-space:pre-wrap}
+.avg{font-size:15px}
+details summary{cursor:pointer;color:var(--mute);font-size:14px}
+button[disabled],input[disabled]{opacity:.55;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -124,6 +150,7 @@ footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
       <input id="q" type="search" placeholder="Search a title or author" autocomplete="off" aria-label="Search books">
       <button class="btn" type="submit">Search</button>
     </form>
+    <button class="clubbar" id="clubBtn"><i class="dotc"></i><b>Start or join a book club</b><span id="clubSub">Share one shelf with your friends</span><span class="go">Open</span></button>
   </div>
 </header>
 
@@ -145,7 +172,12 @@ footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
     <div class="grid" id="resGrid"></div>
   </div>
 </main>
-<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). Your shelf, notes and ratings stay on this device. <span id="ver">Version 6</span></footer>
+<footer class="wrap">Book data and covers from Open Library. Summaries from Wikipedia (CC BY-SA). <span id="where">Your shelf, notes and ratings stay on this device.</span> <span id="ver">Version 7</span></footer>
+
+<div class="sheet" id="clubSheet" hidden role="dialog" aria-modal="true" aria-label="Book club">
+  <div class="top"><div class="wrap"><button class="back" id="clubBack">‹ Back</button></div></div>
+  <div class="wrap clubbody" id="clubBody"></div>
+</div>
 
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="bTitle">
   <div class="top"><div class="wrap"><button class="back" id="back">‹ Back</button></div></div>
@@ -157,18 +189,120 @@ footer{padding-block:20px 32px;color:var(--mute);font-size:13px}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const SHELVES=[['reading','Reading now'],['next','Up next'],['done','Finished']];
+const SHELF_KEYS=SHELVES.map(s=>s[0]);
 const IDEAS=['Wonder','Holes','Percy Jackson','Harry Potter','The Hobbit','Diary of a Wimpy Kid','Charlotte\'s Web','The Hunger Games','Matilda','Animal Farm'];
 
-/* ---------- storage ---------- */
-let db={books:{},pick:null,tab:'reading'};
-try{const s=JSON.parse(localStorage.getItem('bookClub')||'null');if(s&&s.books)db=Object.assign(db,s)}catch(e){}
-const save=()=>{try{localStorage.setItem('bookClub',JSON.stringify(db))}catch(e){}};
+/* ---------- storage on this device ---------- */
+let solo={books:{},pick:null,tab:'reading'};
+try{const s=JSON.parse(localStorage.getItem('bookClub')||'null');if(s&&s.books)solo=Object.assign(solo,s)}catch(e){}
+let db=solo;
+const save=()=>{try{localStorage.setItem('bookClub',JSON.stringify(solo))}catch(e){}};
+let summaries={};try{summaries=JSON.parse(localStorage.getItem('bookClubSummaries')||'{}')||{}}catch(e){}
+const saveSummaries=()=>{try{localStorage.setItem('bookClubSummaries',JSON.stringify(summaries))}catch(e){}};
+
+/* ---------- the shared club ---------- */
+// The club lives in one record on a free storage service. Its id is the club code.
+const API='https://api.restful-api.dev/objects/',KIND='kuzey-bookclub';
+let member=null;try{member=JSON.parse(localStorage.getItem('bookClubMember')||'null')}catch(e){}
+let club=null;try{club=member?JSON.parse(localStorage.getItem('bookClubCache')||'null'):null}catch(e){}
+let isHost=false,lastSync=0,syncMsg='';
+const saveMember=()=>{try{member?localStorage.setItem('bookClubMember',JSON.stringify(member)):localStorage.removeItem('bookClubMember')}catch(e){}};
+const saveCache=()=>{try{club?localStorage.setItem('bookClubCache',JSON.stringify(club)):localStorage.removeItem('bookClubCache')}catch(e){}};
+const hex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,'0')).join('');
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+const fmtCode=id=>String(id).toUpperCase().match(/.{1,4}/g).join('-');
+const parseCode=s=>{const m=String(s||'').replace(/^.*#join=/,'').replace(/[^0-9a-f]/gi,'').toLowerCase();return /^[0-9a-f]{16,64}$/.test(m)?m:null};
+const inviteLink=()=>location.origin+location.pathname+'#join='+member.id;
+class ClubError extends Error{}
+const ERR={offline:'You seem to be offline. Showing the club as it was last time.',limit:'The free club storage has reached today\'s limit on this device. Try again tomorrow.',
+  missing:'No club was found with that code. Check the code and try again.',server:'The club storage didn\'t answer. Try again in a minute.',
+  hostkey:'That host key doesn\'t match this club.',host:'Only the host can change that.'};
+const errText=e=>ERR[e&&e.message]||ERR.server;
+async function api(method,id,body){
+  let r;
+  try{r=await fetch(API+(id||''),{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(e){throw new ClubError('offline')}
+  if(r.status===404||r.status===400)throw new ClubError('missing');
+  if(r.status===429)throw new ClubError('limit');
+  if(!r.ok)throw new ClubError('server');
+  return r.json();
+}
+const obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+function normalize(d){d=obj(d);d.books=obj(d.books);d.members=obj(d.members);return d}
+async function readClub(id){const o=await api('GET',id);if(!o||o.name!==KIND||obj(o.data).v!==1)throw new ClubError('missing');return normalize(o.data)}
+// read the newest copy, change it, write it back: keeps other people's changes
+async function push(mutate){
+  const d=await readClub(member.id);
+  mutate(d);d.updatedAt=Date.now();
+  await api('PUT',member.id,{name:KIND,data:d});
+  club=d;saveCache();lastSync=Date.now();syncMsg='';await applyClub();
+}
+async function pull(){
+  if(!member)return;
+  syncMsg='Checking for updates…';renderClubBar();
+  try{club=await readClub(member.id);saveCache();lastSync=Date.now();syncMsg=''}
+  catch(e){syncMsg=errText(e)}
+  await applyClub();
+}
+function cleanBook(id,b){b=obj(b);return{id,title:String(b.title||'Untitled').slice(0,200),author:String(b.author||'Unknown author').slice(0,120),
+  year:Number.isFinite(+b.year)&&b.year?+b.year:null,cover:Number.isFinite(+b.cover)&&b.cover?+b.cover:null,pages:Number.isFinite(+b.pages)&&b.pages?+b.pages:null,
+  subjects:Array.isArray(b.subjects)?b.subjects.slice(0,6).map(s=>String(s).slice(0,40)):[],access:b.access===undefined?undefined:String(b.access),
+  ia:b.ia?String(b.ia):null,lend:b.lend?String(b.lend):null,gid:b.gid?String(b.gid):null}}
+async function applyClub(){
+  if(member&&club){
+    isHost=!!(member.hostKey&&club.hostHash===await sha(member.hostKey));
+    const books={};
+    for(const [id,x] of Object.entries(club.books)){if(!/^OL\d+W$/.test(id)||!x||!x.book)continue;
+      books[id]={book:cleanBook(id,x.book),shelf:SHELF_KEYS.includes(x.shelf)?x.shelf:null,t:+x.t||0,summary:summaries[id],meet:id===club.pick?String(club.meet||''):''}}
+    db={books,pick:club.pick&&books[club.pick]?club.pick:null,tab:solo.tab};
+  }else{db=solo;isHost=false}
+  renderClubBar();renderHome();
+  if(!$('clubSheet').hidden)renderClubSheet();
+  if(openId)paintBook(openId);
+}
+function people(){return Object.entries(club?club.members:{}).map(([mid,m])=>({mid,nick:String(obj(m).nick||'Someone').slice(0,20),ratings:obj(obj(m).ratings),notes:obj(obj(m).notes),host:mid===club.hostMid}))}
+function entry(id){
+  const e=Object.assign({},db.books[id]||{});
+  if(member&&club){const me=obj(club.members[member.mid]);e.rating=+obj(me.ratings)[id]||0;e.notes=String(obj(me.notes)[id]||'')}
+  return e;
+}
+async function startClub(name,nick){
+  const hostKey=hex(12),mid=hex(6),books={},ratings={},notes={};
+  for(const [id,x] of Object.entries(solo.books)){if(x.shelf){books[id]={book:x.book,shelf:x.shelf,t:x.t||Date.now()}}if(x.rating)ratings[id]=x.rating;if(x.notes)notes[id]=x.notes}
+  const pick=solo.pick&&books[solo.pick]?solo.pick:null;
+  const data={v:1,clubName:name,hostHash:await sha(hostKey),hostMid:mid,pick,meet:pick?(solo.books[pick].meet||''):'',books,members:{[mid]:{nick,ratings,notes}},createdAt:Date.now()};
+  const o=await api('POST',null,{name:KIND,data});
+  if(!o||!o.id)throw new ClubError('server');
+  member={id:o.id,mid,nick,hostKey};saveMember();club=data;saveCache();lastSync=Date.now();await applyClub();
+}
+async function joinClub(code,nick,hostKey){
+  const d=await readClub(code);
+  if(hostKey&&d.hostHash!==await sha(hostKey))throw new ClubError('hostkey');
+  // same nickname on another device: carry on as that person
+  let mid=hostKey?d.hostMid:null;
+  if(!mid)for(const [k,m] of Object.entries(d.members))if(String(obj(m).nick||'').toLowerCase()===nick.toLowerCase())mid=k;
+  member={id:code,mid:mid||hex(6),nick,hostKey:hostKey||null};saveMember();
+  await push(x=>{const m=x.members[member.mid]=obj(x.members[member.mid]);m.nick=nick;m.ratings=obj(m.ratings);m.notes=obj(m.notes)});
+}
+function leaveClub(){member=null;club=null;saveMember();saveCache();applyClub();renderClubSheet()}
+async function change(kind,value,info){
+  if(['shelf','pick','meet'].includes(kind)&&!isHost)throw new ClubError('host');
+  await push(d=>{
+    const id=info.id;
+    const ensure=()=>{d.books[id]=obj(d.books[id]);d.books[id].book=info;d.books[id].t=d.books[id].t||Date.now()};
+    if(kind==='shelf'){if(value){ensure();d.books[id].shelf=value;d.books[id].t=Date.now()}else if(d.pick===id){ensure();d.books[id].shelf=null}else delete d.books[id]}
+    if(kind==='pick'){if(value){ensure();if(!d.books[id].shelf)d.books[id].shelf='reading';if(d.pick!==id)d.meet='';d.pick=id}else if(d.pick===id){d.pick=null;d.meet='';if(!obj(d.books[id]).shelf)delete d.books[id]}}
+    if(kind==='meet'&&d.pick===id)d.meet=/^\d{4}-\d{2}-\d{2}$/.test(value)?value:'';
+    if(kind==='rating'||kind==='notes'){const m=d.members[member.mid]=obj(d.members[member.mid]);m.nick=member.nick;m.ratings=obj(m.ratings);m.notes=obj(m.notes);
+      if(kind==='rating'){if(value)m.ratings[id]=value;else delete m.ratings[id]}
+      else{const v=String(value).slice(0,1000);if(v.trim())m.notes[id]=v;else delete m.notes[id]}}
+  });
+}
 
 /* ---------- covers ---------- */
 const PH=['#1f4d3a','#7a3b2e','#2e4a7a','#5b3f7a','#7a6a2e','#2e6a6a'];
 function coverHTML(b,size='M'){
   const bg=PH[(b.title||'').length%PH.length];
-  const img=b.cover?`<img src="https://covers.openlibrary.org/b/id/${b.cover}-${size}.jpg" alt="" loading="lazy" onerror="this.remove()">`:'';
+  const img=b.cover?`<img src="https://covers.openlibrary.org/b/id/${encodeURIComponent(b.cover)}-${size}.jpg" alt="" loading="lazy" onerror="this.remove()">`:'';
   return `<div class="cover" style="background:${bg}"><div class="ph" style="position:absolute;inset:0;display:grid;place-items:center">${esc(b.title)}</div>${img?`<div style="position:absolute;inset:0">${img}</div>`:''}</div>`;
 }
 
@@ -190,8 +324,8 @@ async function search(q){
 }
 function bookTile(b){
   const el=document.createElement('button');el.className='book';
-  const mine=db.books[b.id];
-  el.innerHTML=coverHTML(b)+`<b>${esc(b.title)}</b><small>${esc(b.author)}${b.year?' · '+b.year:''}</small>${b.gid||b.access==='public'?'<span class="badge free">Free to read</span>':b.access==='borrowable'?'<span class="badge">Borrow free</span>':''}${mine&&mine.rating?`<span class="stars-mini">${'★'.repeat(mine.rating)}</span>`:''}`;
+  const mine=entry(b.id);
+  el.innerHTML=coverHTML(b)+`<b>${esc(b.title)}</b><small>${esc(b.author)}${b.year?' · '+esc(b.year):''}</small>${b.gid||b.access==='public'?'<span class="badge free">Free to read</span>':b.access==='borrowable'?'<span class="badge">Borrow free</span>':''}${mine.rating?`<span class="stars-mini">${'★'.repeat(mine.rating)}</span>`:''}`;
   el.onclick=()=>openBook(b);return el;
 }
 $('searchForm').addEventListener('submit',e=>{e.preventDefault();$('q').blur();search($('q').value)});
@@ -223,7 +357,7 @@ async function olDescription(id){
 }
 
 /* ---------- book page ---------- */
-let openId=null;
+let openId=null,openInfo=null,flushNotes=null;
 function questions(b){
   return [`What was your first impression of ${b.title}, and did it change by the end?`,
     `Which character would you most like to meet, and what would you ask them?`,
@@ -233,54 +367,94 @@ function questions(b){
 }
 function openBook(b){
   openId=b.id;
-  const mine=db.books[b.id]||{};
+  const mine=entry(b.id);
   const book=Object.assign({},mine.book||{},b);
+  openInfo={id:book.id,title:book.title,author:book.author,year:book.year,cover:book.cover,pages:book.pages,subjects:(book.subjects||[]).slice(0,6),access:book.access,ia:book.ia,lend:book.lend,gid:book.gid};
+  const inClub=!!(member&&club);
   $('detail').innerHTML=`<div class="side">${coverHTML(book,'L')}</div>
    <div>
      <h2 id="bTitle">${esc(book.title)}</h2>
      <div class="byline">by ${esc(book.author)}</div>
-     <div class="facts">${book.year?`<span>First published ${book.year}</span>`:''}${book.pages?`<span>About ${book.pages} pages</span>`:''}</div>
+     <div class="facts">${book.year?`<span>First published ${esc(book.year)}</span>`:''}${book.pages?`<span>About ${esc(book.pages)} pages</span>`:''}</div>
      <div class="readbox" id="readBox"></div>
      <div class="summary" id="sum"><div class="skel" style="width:95%"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:70%"></div></div>
      ${book.subjects&&book.subjects.length?`<div class="subjects">${book.subjects.slice(0,6).map(s=>`<span>${esc(s)}</span>`).join('')}</div>`:''}
      <div class="panel">
        <h3>For the club</h3>
-       <div class="shelfbtns" id="shelfBtns">${SHELVES.map(([k,l])=>`<button data-s="${k}" aria-pressed="${mine.shelf===k}">${l}</button>`).join('')}</div>
-       <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><input type="checkbox" id="isPick" ${db.pick===book.id?'checked':''}> This is our club pick. We meet on <input type="date" id="meet" value="${esc(db.pick===book.id?mine.meet||'':mine.meet||'')}"></label>
+       <div class="shelfbtns" id="shelfBtns">${SHELVES.map(([k,l])=>`<button data-s="${k}">${l}</button>`).join('')}</div>
+       <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><input type="checkbox" id="isPick"> This is our club pick. We meet on <input type="date" id="meet"></label>
+       <p class="lock" id="lockMsg" hidden></p>
+       <div class="saved" id="clubMsg"></div>
      </div>
      <div class="panel">
        <h3>Your rating</h3>
-       <div class="rate" id="rate">${[1,2,3,4,5].map(n=>`<button aria-label="${n} star${n>1?'s':''}" data-n="${n}" class="${(mine.rating||0)>=n?'on':''}">★</button>`).join('')}</div>
+       <div class="rate" id="rate">${[1,2,3,4,5].map(n=>`<button aria-label="${n} star${n>1?'s':''}" data-n="${n}">★</button>`).join('')}</div>
        <h3>Your notes</h3>
-       <textarea id="notes" placeholder="Favourite part, quotes you liked, questions for the group…">${esc(mine.notes||'')}</textarea>
+       ${inClub?'<p class="lock">Everyone in the club can read your notes, so keep them friendly and not private.</p>':''}
+       <textarea id="notes" maxlength="1000" placeholder="Favourite part, quotes you liked, questions for the group…">${esc(mine.notes||'')}</textarea>
        <div class="saved" id="savedMsg"></div>
      </div>
+     <div class="panel" id="voices" hidden></div>
      <div class="panel">
        <h3>Questions to talk about</h3>
        <ol class="qs">${questions(book).map(q=>`<li>${esc(q)}</li>`).join('')}</ol>
      </div>
    </div>`;
   $('sheet').hidden=false;$('sheet').scrollTop=0;document.body.style.overflow='hidden';$('back').focus();
-  const upd=patch=>{const cur=db.books[book.id]||{};db.books[book.id]=Object.assign(cur,{book:{id:book.id,title:book.title,author:book.author,year:book.year,cover:book.cover,pages:book.pages,subjects:book.subjects,access:book.access,ia:book.ia,lend:book.lend,gid:book.gid}},patch,{t:Date.now()});save();$('savedMsg').textContent='Saved on this device'};
-  $('shelfBtns').onclick=e=>{const s=e.target.dataset.s;if(!s)return;const cur=(db.books[book.id]||{}).shelf;upd({shelf:cur===s?null:s});
-    $('shelfBtns').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s===db.books[book.id].shelf))};
-  $('rate').onclick=e=>{const n=+e.target.dataset.n;if(!n)return;const cur=(db.books[book.id]||{}).rating;const v=cur===n?0:n;upd({rating:v});
-    $('rate').querySelectorAll('button').forEach(x=>x.classList.toggle('on',+x.dataset.n<=v))};
-  let tm;$('notes').oninput=()=>{clearTimeout(tm);$('savedMsg').textContent='';tm=setTimeout(()=>upd({notes:$('notes').value}),400)};
-  $('isPick').onchange=()=>{db.pick=$('isPick').checked?book.id:(db.pick===book.id?null:db.pick);upd({shelf:(db.books[book.id]||{}).shelf||($('isPick').checked?'reading':null)});
-    $('shelfBtns').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s===db.books[book.id].shelf))};
-  $('meet').onchange=()=>upd({meet:$('meet').value});
+  const info=openInfo;
+  const upd=patch=>{const cur=solo.books[book.id]||{};solo.books[book.id]=Object.assign(cur,{book:info},patch,{t:Date.now()});save();$('savedMsg').textContent='Saved on this device'};
+  // club changes go online; solo changes stay on this device
+  const send=async(kind,value,msgEl)=>{
+    $(msgEl).textContent='Saving to the club…';
+    try{await change(kind,value,info);if(openId===info.id)$(msgEl).textContent='Saved to the club'}
+    catch(e){if(openId===info.id){$(msgEl).textContent=errText(e);paintBook(info.id)}}
+  };
+  $('shelfBtns').onclick=e=>{const s=e.target.dataset.s;if(!s||e.target.disabled)return;const v=entry(book.id).shelf===s?null:s;
+    if(member&&club){paintShelf(v);send('shelf',v,'clubMsg')}else{upd({shelf:v});paintBook(book.id)}};
+  $('rate').onclick=e=>{const n=+e.target.dataset.n;if(!n)return;const v=entry(book.id).rating===n?0:n;paintRating(v);
+    if(member&&club)send('rating',v,'savedMsg');else upd({rating:v})};
+  let tm;
+  flushNotes=()=>{if(!tm)return;clearTimeout(tm);tm=null;delete $('notes').dataset.dirty;const v=$('notes').value;if(member&&club)send('notes',v,'savedMsg');else upd({notes:v})};
+  $('notes').oninput=()=>{$('notes').dataset.dirty='1';clearTimeout(tm);$('savedMsg').textContent='';tm=setTimeout(flushNotes,member&&club?2500:400)};
+  $('notes').onblur=()=>flushNotes&&flushNotes();
+  $('isPick').onchange=()=>{const on=$('isPick').checked;
+    if(member&&club){send('pick',on,'clubMsg');return}
+    solo.pick=on?book.id:(solo.pick===book.id?null:solo.pick);upd({shelf:(solo.books[book.id]||{}).shelf||(on?'reading':null)});paintBook(book.id)};
+  $('meet').onchange=()=>{if(member&&club)send('meet',$('meet').value,'clubMsg');else upd({meet:$('meet').value})};
+  paintBook(book.id);
   renderRead(book);
   loadSummary(book);
 }
+function paintShelf(v){$('shelfBtns').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s===v))}
+function paintRating(v){$('rate').querySelectorAll('button').forEach(x=>x.classList.toggle('on',+x.dataset.n<=v))}
+function paintBook(id){
+  if(openId!==id||!$('shelfBtns'))return;
+  const e=entry(id),inClub=!!(member&&club),locked=inClub&&!isHost;
+  paintShelf(e.shelf);paintRating(e.rating||0);
+  $('isPick').checked=db.pick===id;$('meet').value=db.pick===id?(e.meet||''):'';$('meet').disabled=locked||db.pick!==id;
+  $('shelfBtns').querySelectorAll('button').forEach(x=>x.disabled=locked);$('isPick').disabled=locked;
+  const host=inClub&&people().find(p=>p.host);
+  $('lockMsg').hidden=!locked;$('lockMsg').textContent=locked?`Only the host${host?', '+host.nick+',':''} can change the shelf and the club pick.`:'';
+  if(document.activeElement!==$('notes')&&!$('notes').dataset.dirty)$('notes').value=e.notes||'';
+  // what the rest of the club thinks
+  const v=$('voices');
+  if(!inClub){v.hidden=true;return}
+  const others=people().filter(p=>p.mid!==member.mid&&(p.ratings[id]||p.notes[id]));
+  const all=people().map(p=>+p.ratings[id]||0).filter(Boolean);
+  const avg=all.length?(all.reduce((a,b)=>a+b,0)/all.length):0;
+  v.hidden=false;
+  v.innerHTML=`<h3>The club's ratings and notes</h3>${all.length?`<div class="avg"><span class="stars-mini" style="font-size:18px">${'★'.repeat(Math.round(avg))}</span> ${avg.toFixed(1)} from ${all.length} ${all.length===1?'person':'people'}</div>`:''}
+    ${others.length?`<div class="voices">${others.map(p=>`<div class="voice"><b>${esc(p.nick)}${p.host?' <span class="tag">Host</span>':''}${p.ratings[id]?` <span class="stars-mini">${'★'.repeat(Math.min(5,+p.ratings[id]||0))}</span>`:''}</b>${p.notes[id]?`<p>${esc(String(p.notes[id]).slice(0,1000))}</p>`:''}</div>`).join('')}</div>`
+      :'<p class="lock">Nobody else has rated this book or written notes yet.</p>'}`;
+}
 async function loadSummary(book){
-  const id=book.id,cached=(db.books[id]||{}).summary;
+  const id=book.id,cached=summaries[id]||(solo.books[id]||{}).summary;
   const put=s=>{if(openId!==id)return;
     $('sum').innerHTML=s?s.text.split(/\n+/).filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('')+`<p class="source">Summary from ${s.source==='Open Library'?'Open Library':'Wikipedia'}${s.url?` · <a href="${esc(s.url)}" target="_blank" rel="noopener">Read more</a>`:''}</p>`
       :`<p class="mute">There's no summary for this book yet. Try a different edition in the search results, or add your own in the notes below.</p>`};
   if(cached)put(cached);
   let s=await wikiSummary(book.title);if(s)s.source='Wikipedia';else s=await olDescription(id);
-  if(s){if(db.books[id]){db.books[id].summary=s;save()}put(s)}else if(!cached)put(null);
+  if(s){summaries[id]=s;saveSummaries();put(s)}else if(!cached)put(null);
 }
 async function renderRead(book){
   const box=$('readBox'),id=book.id;
@@ -290,7 +464,8 @@ async function renderRead(book){
       const d=((await r.json()).docs||[])[0]||{};
       book.access=d.ebook_access||'no_ebook';book.ia=(d.ia||[])[0]||null;book.lend=d.lending_edition_s||null;
       book.gid=(d.id_project_gutenberg||[]).map(Number).filter(n=>n>0).sort((x,y)=>x-y).map(String)[0]||null;
-      if(db.books[id])Object.assign(db.books[id].book,{access:book.access,ia:book.ia,lend:book.lend,gid:book.gid}),save();
+      if(solo.books[id])Object.assign(solo.books[id].book,{access:book.access,ia:book.ia,lend:book.lend,gid:book.gid}),save();
+      if(openInfo&&openInfo.id===id)Object.assign(openInfo,{access:book.access,ia:book.ia,lend:book.lend,gid:book.gid});
     }catch(e){book.access='no_ebook'}
     if(openId!==id)return;
   }
@@ -308,34 +483,119 @@ async function renderRead(book){
   const q=book.title.replace(/\s*[:(].*$/,'')+' '+(book.author||'').split(' ').pop();
   fetch('https://gutendex.com/books/?search='+encodeURIComponent(q)).then(r=>r.ok?r.json():null).then(j=>{
     const hit=(j&&j.results||[]).find(r=>!r.copyright&&r.title.toLowerCase().startsWith(book.title.toLowerCase().slice(0,12)));
-    if(hit){book.gid=String(hit.id);if(db.books[id]){db.books[id].book.gid=book.gid;save()}}
+    if(hit){book.gid=String(hit.id);if(solo.books[id]){solo.books[id].book.gid=book.gid;save()}}
     draw(book.gid);
   }).catch(()=>draw(null));
 }
-function closeBook(){$('sheet').hidden=true;openId=null;document.body.style.overflow='';renderHome();if(!$('results').hidden)search($('q').value)}
+function closeBook(){flushNotes&&flushNotes();flushNotes=null;$('sheet').hidden=true;openId=null;openInfo=null;document.body.style.overflow='';renderHome();if(!$('results').hidden)search($('q').value)}
 $('back').onclick=closeBook;
-addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('sheet').hidden)closeBook()});
+addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('sheet').hidden)closeBook();else if(!$('clubSheet').hidden)closeClub()});
+
+/* ---------- club page ---------- */
+function ago(t){if(!t)return'';const s=(Date.now()-t)/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return new Date(t).toLocaleDateString()}
+function renderClubBar(){
+  const btn=$('clubBtn');
+  $('where').textContent=member&&club?'Your club is shared online with everyone who has its code.':'Your shelf, notes and ratings stay on this device.';
+  if(member&&club){btn.querySelector('b').textContent=String(club.clubName||'Our book club').slice(0,40);
+    $('clubSub').textContent=(isHost?'You\'re the host':'You\'re a member')+' as '+member.nick+(syncMsg?' · '+syncMsg:lastSync?' · updated '+ago(lastSync):'');
+    btn.querySelector('.go').textContent='Club';}
+  else{btn.querySelector('b').textContent='Start or join a book club';$('clubSub').textContent='Share one shelf with your friends';btn.querySelector('.go').textContent='Open'}
+}
+function copy(text,btn){
+  const done=()=>{const o=btn.textContent;btn.textContent='Copied';setTimeout(()=>btn.textContent=o,1300)};
+  try{navigator.clipboard.writeText(text).then(done,()=>prompt('Copy this:',text))}catch(e){prompt('Copy this:',text)}
+}
+let prefill='';
+function renderClubSheet(){
+  const b=$('clubBody');
+  if(!(member&&club)){
+    const nick=String((member&&member.nick)||localStorage.getItem('bookClubNick')||'');
+    b.innerHTML=`<div><h2>Book club</h2><p class="mute">Start a club and share its code. Everyone who joins sees the same shelf, club pick and meeting date. Only the host can change those. Everyone can rate books and write notes, and the whole club can see them.</p></div>
+      <div class="panel"><h3>Join a club</h3>
+        <label class="field">Club code<input id="jCode" autocomplete="off" autocapitalize="characters" placeholder="Paste the code or invite link" value="${esc(prefill)}"></label>
+        <label class="field">Your nickname<input id="jNick" maxlength="20" autocomplete="nickname" value="${esc(nick)}"></label>
+        <details><summary>I'm the host, joining on another device</summary><label class="field" style="margin-top:8px">Host key<input id="jKey" autocomplete="off"></label></details>
+        <div class="row"><button class="btn" id="jGo">Join the club</button></div></div>
+      <div class="panel"><h3>Start a new club</h3>
+        <label class="field">Club name<input id="cName" maxlength="40" placeholder="Kuzey's Book Club"></label>
+        <label class="field">Your nickname<input id="cNick" maxlength="20" autocomplete="nickname" value="${esc(nick)}"></label>
+        <p class="lock">You'll be the host. Books already on your shelf move into the new club.</p>
+        <div class="row"><button class="btn" id="cGo">Start the club</button></div></div>
+      <p class="err" id="clubErr" hidden></p>
+      <p class="lock">The club is kept on a free online storage service. Anyone who has the code can see it, so don't write anything private.</p>`;
+    const fail=e=>{$('clubErr').hidden=false;$('clubErr').textContent=e.message&&ERR[e.message]?ERR[e.message]:e.message||ERR.server};
+    const busy=(btn,on,label)=>{btn.disabled=on;if(label)btn.textContent=label};
+    $('jGo').onclick=async()=>{const code=parseCode($('jCode').value),nick=$('jNick').value.trim().slice(0,20),key=($('jKey').value||'').trim();
+      if(!code)return fail(new Error('Paste the club code or invite link first. It looks like FF80-8181-…'));
+      if(!nick)return fail(new Error('Type a nickname so the club knows who you are.'));
+      try{localStorage.setItem('bookClubNick',nick)}catch(e){}
+      busy($('jGo'),true,'Joining…');try{await joinClub(code,nick,key);prefill=''}catch(e){member=null;saveMember();fail(e);busy($('jGo'),false,'Join the club')}};
+    $('cGo').onclick=async()=>{const name=$('cName').value.trim().slice(0,40)||'Our Book Club',nick=$('cNick').value.trim().slice(0,20);
+      if(!nick)return fail(new Error('Type a nickname so the club knows who you are.'));
+      try{localStorage.setItem('bookClubNick',nick)}catch(e){}
+      busy($('cGo'),true,'Starting…');try{await startClub(name,nick)}catch(e){fail(e);busy($('cGo'),false,'Start the club')}};
+    return;
+  }
+  const ps=people();
+  const other=prefill&&parseCode(prefill)!==member.id;
+  b.innerHTML=`${other?`<p class="err">You opened an invite to a different club (${esc(prefill)}). To join it, leave this club first, then open the invite again.</p>`:''}<div><h2>${esc(String(club.clubName||'Our book club').slice(0,40))}</h2>
+      <p class="mute">You're ${isHost?'<b>the host</b>':'a member'} as <b>${esc(member.nick)}</b>. ${syncMsg?esc(syncMsg):lastSync?'Updated '+ago(lastSync)+'.':''}</p></div>
+    <div class="panel"><h3>Invite people</h3>
+      <div class="codebox" id="codeBox">${esc(fmtCode(member.id))}</div>
+      <div class="row"><button class="btn small" id="cpLink">Copy invite link</button><button class="btn quiet small" id="cpCode">Copy code</button></div>
+      <p class="lock">Send the link to your friends. They open it, type a nickname, and they're in. The code never changes.</p></div>
+    ${isHost?`<div class="panel"><h3>Your host key</h3>
+      <p class="lock">Keep this secret. To manage the club on your other devices too, join there with the code and enter this key under "I'm the host".</p>
+      <div class="codebox">${esc(member.hostKey)}</div><div class="row"><button class="btn quiet small" id="cpKey">Copy host key</button></div></div>`:''}
+    <div class="panel"><h3>Members (${ps.length})</h3>
+      <ul class="members">${ps.map(p=>`<li>${esc(p.nick)}${p.host?' <span class="tag">Host</span>':''}${p.mid===member.mid?' <span class="mute small">(you)</span>':''}</li>`).join('')}</ul></div>
+    <div class="row"><button class="btn quiet" id="refresh">Check for updates</button><button class="btn quiet" id="leave">Leave this club on this device</button></div>
+    <p class="lock">Leaving only removes the club from this device. You can join again any time with the code${isHost?' and your host key':''}.</p>`;
+  $('cpLink').onclick=e=>copy(inviteLink(),e.target);$('cpCode').onclick=e=>copy(fmtCode(member.id),e.target);
+  if(isHost)$('cpKey').onclick=e=>copy(member.hostKey,e.target);
+  $('refresh').onclick=()=>pull();
+  let armed=false;$('leave').onclick=e=>{if(!armed){armed=true;e.target.textContent=isHost?'Tap again. Save your host key first!':'Tap again to leave';setTimeout(()=>{armed=false;if(e.target.isConnected)e.target.textContent='Leave this club on this device'},4000);return}leaveClub()};
+}
+function openClub(){renderClubSheet();$('clubSheet').hidden=false;$('clubSheet').scrollTop=0;document.body.style.overflow='hidden';$('clubBack').focus()}
+function closeClub(){$('clubSheet').hidden=true;document.body.style.overflow='';renderHome()}
+$('clubBtn').onclick=openClub;$('clubBack').onclick=closeClub;
 
 /* ---------- home ---------- */
 function renderHome(){
   const pick=db.pick&&db.books[db.pick];
+  const locked=member&&club&&!isHost;
   if(pick){const b=pick.book;let when='';
     if(pick.meet){const d=new Date(pick.meet+'T12:00:00'),days=Math.round((d-new Date().setHours(12,0,0,0))/864e5);
       when=days>1?`We meet in ${days} days`:days===1?'We meet tomorrow':days===0?'We meet today!':'Last meeting: '+d.toLocaleDateString()}
     $('pickSect').innerHTML='';const btn=document.createElement('button');btn.className='pick';
-    btn.innerHTML=coverHTML(b)+`<div><div class="label">Our club pick</div><h3>${esc(b.title)}</h3><div class="mute">by ${esc(b.author)}</div>${when?`<span class="when">${when}</span>`:'<span class="when mute">Set a meeting date on the book page</span>'}</div>`;
+    btn.innerHTML=coverHTML(b)+`<div><div class="label">Our club pick</div><h3>${esc(b.title)}</h3><div class="mute">by ${esc(b.author)}</div>${when?`<span class="when">${when}</span>`:`<span class="when mute">${locked?'No meeting date yet':'Set a meeting date on the book page'}</span>`}</div>`;
     btn.onclick=()=>openBook(b);$('pickSect').appendChild(btn);
-  }else $('pickSect').innerHTML='<div class="empty"><b>No club pick yet.</b> Search for a book, open it, and tick "This is our club pick".</div>';
+  }else $('pickSect').innerHTML=`<div class="empty"><b>No club pick yet.</b> ${locked?'The host will choose one soon.':'Search for a book, open it, and tick "This is our club pick".'}</div>`;
   const counts=Object.fromEntries(SHELVES.map(([k])=>[k,Object.values(db.books).filter(x=>x.shelf===k).length]));
-  $('tabs').innerHTML=SHELVES.map(([k,l])=>`<button class="tab" data-k="${k}" aria-pressed="${db.tab===k}">${l}<b>${counts[k]}</b></button>`).join('');
-  $('tabs').onclick=e=>{const k=e.target.closest('.tab')?.dataset.k;if(k){db.tab=k;save();renderHome()}};
-  const list=Object.values(db.books).filter(x=>x.shelf===db.tab).sort((a,b)=>(b.t||0)-(a.t||0));
+  $('tabs').innerHTML=SHELVES.map(([k,l])=>`<button class="tab" data-k="${k}" aria-pressed="${solo.tab===k}">${l}<b>${counts[k]}</b></button>`).join('');
+  $('tabs').onclick=e=>{const k=e.target.closest('.tab')?.dataset.k;if(k){solo.tab=k;db.tab=k;save();renderHome()}};
+  const list=Object.values(db.books).filter(x=>x.shelf===solo.tab).sort((a,b)=>(b.t||0)-(a.t||0));
   const sh=$('shelf');sh.innerHTML='';
-  if(!list.length){sh.innerHTML=`<div class="empty">Nothing on "${SHELVES.find(s=>s[0]===db.tab)[1]}" yet. Open any book and tap the shelf button to add it here.</div>`;return}
+  if(!list.length){sh.innerHTML=`<div class="empty">Nothing on "${SHELVES.find(s=>s[0]===solo.tab)[1]}" yet. ${locked?'The host adds books to the club shelf.':'Open any book and tap the shelf button to add it here.'}</div>`;return}
   const g=document.createElement('div');g.className='grid';list.forEach(x=>g.appendChild(bookTile(x.book)));sh.appendChild(g);
 }
 IDEAS.forEach(t=>{const c=document.createElement('button');c.className='chip';c.textContent=t;c.onclick=()=>{$('q').value=t;search(t)};$('ideas').appendChild(c)});
-renderHome();
+
+/* ---------- start ---------- */
+applyClub();
+if(member)pull();
+// invite links: #join=CODE
+function checkInvite(){
+  const inv=location.hash.startsWith('#join=')?parseCode(location.hash):null;
+  if(!inv)return;
+  history.replaceState(null,'',location.pathname);
+  if(member&&member.id===inv){openClub();return} // already in this club
+  prefill=fmtCode(inv);openClub();
+}
+checkInvite();addEventListener('hashchange',checkInvite);
+// check again when coming back to the app, at most every 2 minutes
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&member&&Date.now()-lastSync>120000)pull()});
+setInterval(()=>{if(member&&club)renderClubBar()},30000);
 if('serviceWorker' in navigator){
   // when a new version takes over, reload once so it shows straight away
   let reloaded=false;const had=!!navigator.serviceWorker.controller;

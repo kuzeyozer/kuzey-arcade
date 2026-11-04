@@ -1,5 +1,5 @@
 // App shell from the cache; book searches and summaries from the network, cached for offline reading.
-const VERSION = 'bookclub-v6';
+const VERSION = 'bookclub-v7';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys()

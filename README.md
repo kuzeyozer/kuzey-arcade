@@ -15,3 +15,9 @@ When you change a file, bump `VERSION` in `sw.js` so installed copies pick up th
 A separate app at https://kuzeyozer.github.io/kuzey-arcade/bookclub/ (add it to the home screen on its own).
 Search any book through Open Library, read its summary from Wikipedia, and keep the club's shelf,
 pick, meeting date, ratings and notes on the device.
+
+### Book clubs
+
+Start a club from the club bar: the app creates one shared record on the free restful-api.dev storage
+(about 50 requests a day per device), and its id is the club code. Only the device holding the host key
+can change the shelf, pick and meeting date; every member's ratings and notes are shared.
