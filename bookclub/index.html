@@ -67,6 +67,13 @@ h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0;line-heigh
 .cover{aspect-ratio:2/3;width:100%;border-radius:6px;overflow:hidden;background:var(--sunk);box-shadow:0 2px 0 rgba(0,0,0,.08),0 6px 16px rgba(19,36,28,.14);position:relative;display:grid;place-items:center}
 .cover img{width:100%;height:100%;object-fit:cover;display:block}
 .cover .ph{padding:10px;text-align:center;font-family:var(--display);font-size:15px;line-height:1.2;color:var(--club-ink)}
+.badge{align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--mute)}
+.badge.free{background:var(--club);color:var(--club-ink)}
+.readbox{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.readrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn.read{background:var(--club);color:var(--club-ink)}
+a.btn{text-decoration:none;display:inline-block}
+.small{font-size:14px;margin:0}
 .stars-mini{color:var(--brass);font-size:13px;letter-spacing:1px}
 .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:18px;color:var(--mute)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -173,10 +180,10 @@ async function search(q){
   $('resStatus').textContent='Searching…';$('resGrid').innerHTML='';
   searchCtl?.abort();searchCtl=new AbortController();
   try{
-    const r=await fetch('https://openlibrary.org/search.json?q='+encodeURIComponent(q)+'&limit=24&fields=key,title,author_name,first_publish_year,cover_i,number_of_pages_median,subject',{signal:searchCtl.signal});
+    const r=await fetch('https://openlibrary.org/search.json?q='+encodeURIComponent(q)+'&limit=24&fields=key,title,author_name,first_publish_year,cover_i,number_of_pages_median,subject,ebook_access,ia,lending_edition_s,id_project_gutenberg',{signal:searchCtl.signal});
     if(!r.ok)throw new Error(r.status);
     const j=await r.json();
-    const list=(j.docs||[]).filter(d=>d.key&&d.title).map(d=>({id:d.key.replace('/works/',''),title:d.title,author:(d.author_name||[])[0]||'Unknown author',year:d.first_publish_year||null,cover:d.cover_i||null,pages:d.number_of_pages_median||null,subjects:(d.subject||[]).slice(0,8)}));
+    const list=(j.docs||[]).filter(d=>d.key&&d.title).map(d=>({id:d.key.replace('/works/',''),title:d.title,author:(d.author_name||[])[0]||'Unknown author',year:d.first_publish_year||null,cover:d.cover_i||null,pages:d.number_of_pages_median||null,subjects:(d.subject||[]).slice(0,8),access:d.ebook_access||'no_ebook',ia:(d.ia||[])[0]||null,lend:d.lending_edition_s||null,gid:(d.id_project_gutenberg||[])[0]||null}));
     $('resStatus').textContent=list.length?list.length+' books found. Tap one for its summary.':'No books found. Check the spelling, or try the author\'s name.';
     $('resGrid').innerHTML='';list.forEach(b=>$('resGrid').appendChild(bookTile(b)));
   }catch(e){if(e.name==='AbortError')return;$('resStatus').textContent='The book search did not answer. Check your internet connection and try again.'}
@@ -184,7 +191,7 @@ async function search(q){
 function bookTile(b){
   const el=document.createElement('button');el.className='book';
   const mine=db.books[b.id];
-  el.innerHTML=coverHTML(b)+`<b>${esc(b.title)}</b><small>${esc(b.author)}${b.year?' · '+b.year:''}</small>${mine&&mine.rating?`<span class="stars-mini">${'★'.repeat(mine.rating)}</span>`:''}`;
+  el.innerHTML=coverHTML(b)+`<b>${esc(b.title)}</b><small>${esc(b.author)}${b.year?' · '+b.year:''}</small>${b.gid||b.access==='public'?'<span class="badge free">Free to read</span>':b.access==='borrowable'?'<span class="badge">Borrow free</span>':''}${mine&&mine.rating?`<span class="stars-mini">${'★'.repeat(mine.rating)}</span>`:''}`;
   el.onclick=()=>openBook(b);return el;
 }
 $('searchForm').addEventListener('submit',e=>{e.preventDefault();$('q').blur();search($('q').value)});
@@ -233,6 +240,7 @@ function openBook(b){
      <h2 id="bTitle">${esc(book.title)}</h2>
      <div class="byline">by ${esc(book.author)}</div>
      <div class="facts">${book.year?`<span>First published ${book.year}</span>`:''}${book.pages?`<span>About ${book.pages} pages</span>`:''}</div>
+     <div class="readbox" id="readBox"></div>
      <div class="summary" id="sum"><div class="skel" style="width:95%"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:70%"></div></div>
      ${book.subjects&&book.subjects.length?`<div class="subjects">${book.subjects.slice(0,6).map(s=>`<span>${esc(s)}</span>`).join('')}</div>`:''}
      <div class="panel">
@@ -253,7 +261,7 @@ function openBook(b){
      </div>
    </div>`;
   $('sheet').hidden=false;$('sheet').scrollTop=0;document.body.style.overflow='hidden';$('back').focus();
-  const upd=patch=>{const cur=db.books[book.id]||{};db.books[book.id]=Object.assign(cur,{book:{id:book.id,title:book.title,author:book.author,year:book.year,cover:book.cover,pages:book.pages,subjects:book.subjects}},patch,{t:Date.now()});save();$('savedMsg').textContent='Saved on this device'};
+  const upd=patch=>{const cur=db.books[book.id]||{};db.books[book.id]=Object.assign(cur,{book:{id:book.id,title:book.title,author:book.author,year:book.year,cover:book.cover,pages:book.pages,subjects:book.subjects,access:book.access,ia:book.ia,lend:book.lend,gid:book.gid}},patch,{t:Date.now()});save();$('savedMsg').textContent='Saved on this device'};
   $('shelfBtns').onclick=e=>{const s=e.target.dataset.s;if(!s)return;const cur=(db.books[book.id]||{}).shelf;upd({shelf:cur===s?null:s});
     $('shelfBtns').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s===db.books[book.id].shelf))};
   $('rate').onclick=e=>{const n=+e.target.dataset.n;if(!n)return;const cur=(db.books[book.id]||{}).rating;const v=cur===n?0:n;upd({rating:v});
@@ -262,6 +270,7 @@ function openBook(b){
   $('isPick').onchange=()=>{db.pick=$('isPick').checked?book.id:(db.pick===book.id?null:db.pick);upd({shelf:(db.books[book.id]||{}).shelf||($('isPick').checked?'reading':null)});
     $('shelfBtns').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.s===db.books[book.id].shelf))};
   $('meet').onchange=()=>upd({meet:$('meet').value});
+  renderRead(book);
   loadSummary(book);
 }
 async function loadSummary(book){
@@ -272,6 +281,26 @@ async function loadSummary(book){
   if(cached)put(cached);
   let s=await wikiSummary(book.title);if(s)s.source='Wikipedia';else s=await olDescription(id);
   if(s){if(db.books[id]){db.books[id].summary=s;save()}put(s)}else if(!cached)put(null);
+}
+function renderRead(book){
+  const box=$('readBox'),id=book.id;
+  const draw=gid=>{
+    if(openId!==id)return;
+    const btns=[];
+    if(gid)btns.push(`<a class="btn read" href="https://www.gutenberg.org/ebooks/${encodeURIComponent(gid)}.html.images" target="_blank" rel="noopener">Read free</a><span class="mute small">The whole book, free from Project Gutenberg</span>`);
+    else if(book.access==='public'&&book.ia)btns.push(`<a class="btn read" href="https://archive.org/details/${encodeURIComponent(book.ia)}?view=theater" target="_blank" rel="noopener">Read free</a><span class="mute small">The whole book, free from the Internet Archive</span>`);
+    if(book.access==='borrowable'&&book.lend)btns.push(`<a class="btn quiet" href="https://openlibrary.org/books/${encodeURIComponent(book.lend)}" target="_blank" rel="noopener">Borrow free</a><span class="mute small">Borrow it like a library book. You need a free Open Library account.</span>`);
+    box.innerHTML=btns.length?btns.map(b=>`<div class="readrow">${b}</div>`).join(''):`<p class="mute small">No free copy of this book online. Ask at your school or local library.</p>`;
+  };
+  if(book.gid||book.access!=='no_ebook'||!(book.year&&book.year<1930)){draw(book.gid);return}
+  // older books Open Library doesn't link: ask Project Gutenberg directly
+  box.innerHTML='<p class="mute small">Looking for a free copy…</p>';
+  const q=book.title.replace(/\s*[:(].*$/,'')+' '+(book.author||'').split(' ').pop();
+  fetch('https://gutendex.com/books/?search='+encodeURIComponent(q)).then(r=>r.ok?r.json():null).then(j=>{
+    const hit=(j&&j.results||[]).find(r=>!r.copyright&&r.title.toLowerCase().startsWith(book.title.toLowerCase().slice(0,12)));
+    if(hit){book.gid=String(hit.id);if(db.books[id]){db.books[id].book.gid=book.gid;save()}}
+    draw(book.gid);
+  }).catch(()=>draw(null));
 }
 function closeBook(){$('sheet').hidden=true;openId=null;document.body.style.overflow='';renderHome();if(!$('results').hidden)search($('q').value)}
 $('back').onclick=closeBook;
