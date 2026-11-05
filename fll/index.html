@@ -206,6 +206,17 @@ ul.facts{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
 .pill{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--panel-hi);color:var(--ink)}
 .pill.amber{background:var(--amber);color:#2a1d00}.pill.coral{background:var(--coral);color:#2a0905}.pill.glow{background:var(--glow);color:#032019}
 .post .body{white-space:pre-wrap;margin:0}
+.filepick{position:relative;overflow:hidden;display:inline-flex}
+.filepick input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.filelist{display:flex;flex-direction:column;gap:6px}
+.filelist:empty{display:none}
+.fchip{display:flex;align-items:center;gap:10px;background:var(--night);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px}
+.fchip b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.fchip small{color:var(--mute);white-space:nowrap}
+.fchip button{background:none;border:0;color:var(--mute);cursor:pointer;padding:2px 6px}
+.fchip button:hover{color:var(--coral)}
+a.flink.file span{background:var(--sky);color:#04203a}
+button.flink{cursor:pointer;font:inherit;font-weight:700;font-size:14px}
 .qa{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
 .qa .q1{font-size:14px}.qa .q1 b{color:var(--sky)}
 .qa .a1{font-size:14px;margin-left:14px;color:var(--leaf)}
@@ -350,14 +361,17 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px}
       <label class="field">Title<input type="text" id="pTitle" maxlength="100" placeholder="Practise the Sürücü role"></label>
       <label class="field">Details<textarea id="pBody" maxlength="2000" placeholder="What should everyone do or know?"></textarea></label>
       <label class="field" id="pDueWrap">Due date<input type="date" id="pDue"></label>
-      <div class="field">Files and links <span class="small" style="font-weight:400">Upload the file to Google Drive, OneDrive or similar, and paste its share link.</span>
+      <div class="field">Files <span class="small" style="font-weight:400">PDF, Word, PowerPoint, Excel, text or photos. Up to 5 files, 10 MB each.</span>
+        <div class="filelist" id="pFileList"></div>
+        <label class="btn quiet small filepick" style="align-self:flex-start">Choose files<input type="file" id="pFiles" multiple accept=".pdf,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*,application/pdf"></label></div>
+      <div class="field">Links <span class="small" style="font-weight:400">Optional: paste a link to a website or video.</span>
         <div id="pLinks" style="display:flex;flex-direction:column;gap:6px"></div><button class="btn quiet small" id="pAddLink" type="button" style="align-self:flex-start">Add another link</button></div>
       <p class="err" id="pErr" hidden></p>
       <div class="row"><button class="btn" id="pPost">Post</button><button class="btn quiet" id="pCancel" hidden>Cancel editing</button></div></div>
     <div class="card"><h2>Homework</h2><div class="posts" id="hwList"></div></div>
     <div class="card"><h2>Announcements</h2><div class="posts" id="annList"></div></div>
   </section>
-  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 3</span></footer>
+  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 4</span></footer>
 </main>
 
 <nav class="tabs" aria-label="Sections">
@@ -773,12 +787,35 @@ const students=()=>live(data.members).filter(([,m])=>m.role==='student').map(([m
 const isDone=(hw,mid)=>!!obj(data.done[hw+'|'+mid]).v;
 let editing=null,postKind='hw';
 function linkRows(list){$('pLinks').innerHTML=(list.length?list:[{t:'',url:''}]).map(l=>`<div class="row" style="flex-wrap:nowrap"><input type="text" class="pl-t" maxlength="40" placeholder="Name (optional)" value="${esc(l.t||'')}" style="flex:1"><input type="text" class="pl-u" maxlength="500" inputmode="url" placeholder="https://drive.google.com/…" value="${esc(l.url||'')}" style="flex:2"></div>`).join('')}
-function resetPost(){editing=null;$('pTitle').value='';$('pBody').value='';$('pDue').value='';linkRows([]);$('pErr').hidden=true;$('pCancel').hidden=true;$('pPost').textContent='Post';$('postTitle').textContent='Post something new';$('postKind').hidden=false}
+function resetPost(){editing=null;newFiles=[];keptFiles=[];droppedFiles=[];if($('pFileList'))paintFiles();$('pTitle').value='';$('pBody').value='';$('pDue').value='';linkRows([]);$('pErr').hidden=true;$('pCancel').hidden=true;$('pPost').textContent='Post';$('postTitle').textContent='Post something new';$('postKind').hidden=false}
 function setKind(k){postKind=k;$('postKind').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String(c.dataset.k===k)));$('pDueWrap').hidden=k!=='hw'}
 $('postKind').onclick=e=>{if(e.target.dataset.k)setKind(e.target.dataset.k)};
 $('pAddLink').onclick=()=>{const rows=[...$('pLinks').children];if(rows.length>=5)return toast('Up to 5 links');const d=document.createElement('div');d.innerHTML=`<div class="row" style="flex-wrap:nowrap"><input type="text" class="pl-t" maxlength="40" placeholder="Name (optional)" style="flex:1"><input type="text" class="pl-u" maxlength="500" inputmode="url" placeholder="https://drive.google.com/…" style="flex:2"></div>`;$('pLinks').appendChild(d.firstChild)};
 $('pCancel').onclick=resetPost;
-$('pPost').onclick=()=>{
+const BUCKET='class-files',MAXF=5,MAXB=10*1024*1024;
+const MIME={pdf:'application/pdf',txt:'text/plain',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',heic:'image/heic',heif:'image/heif',
+  doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',ppt:'application/vnd.ms-powerpoint',
+  pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
+const extOf=n=>(String(n).toLowerCase().match(/\.([a-z0-9]{1,5})$/)||[])[1]||'';
+const mimeOf=f=>MIME[extOf(f.name)]||(Object.values(MIME).includes(f.type)?f.type:'');
+const kb=n=>n<1024*1024?Math.max(1,Math.round(n/1024))+' KB':(n/1048576).toFixed(1)+' MB';
+let newFiles=[],keptFiles=[],droppedFiles=[];
+function paintFiles(){
+  $('pFileList').innerHTML=[...keptFiles.map((f,i)=>`<div class="fchip"><b>${esc(f.name)}</b><small>${kb(+f.size||0)}</small><button type="button" data-kept="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`),
+    ...newFiles.map((f,i)=>`<div class="fchip"><b>${esc(f.name)}</b><small>${kb(f.size)} · new</small><button type="button" data-new="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`)].join('');
+}
+$('pFileList').onclick=e=>{const k=e.target.dataset.kept,n=e.target.dataset.new;if(k!==undefined){droppedFiles.push(keptFiles[+k]);keptFiles.splice(+k,1)}else if(n!==undefined)newFiles.splice(+n,1);else return;paintFiles()};
+$('pFiles').onchange=()=>{const fail=m=>{$('pErr').hidden=false;$('pErr').textContent=m};$('pErr').hidden=true;
+  for(const f of $('pFiles').files){
+    if(keptFiles.length+newFiles.length>=MAXF){fail('Up to '+MAXF+' files per post.');break}
+    if(!mimeOf(f)){fail(f.name+" can't be added. Use a PDF, Word, PowerPoint, Excel, text file or a photo.");continue}
+    if(f.size>MAXB){fail(f.name+' is '+kb(f.size)+'. Files can be up to 10 MB.');continue}
+    newFiles.push(f)}
+  $('pFiles').value='';paintFiles()};
+// a safe, readable file name for storage
+const safeName=n=>String(n).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(-80)||'file';
+async function removeStored(files){const paths=(files||[]).map(f=>obj(f).path).filter(Boolean);if(paths.length&&sb)try{await sb.storage.from(BUCKET).remove(paths)}catch(e){}}
+$('pPost').onclick=async()=>{
   if(!isTeacher())return;
   const title=$('pTitle').value.trim().slice(0,100),body=$('pBody').value.trim().slice(0,2000);
   const fail=m=>{$('pErr').hidden=false;$('pErr').textContent=m};
@@ -786,7 +823,21 @@ $('pPost').onclick=()=>{
   const links=[];for(const r of $('pLinks').children){const u=r.querySelector('.pl-u').value.trim();if(!u)continue;const s=safeUrl(u);if(!s)return fail('This link doesn\'t look right: '+u.slice(0,60)+'. Links start with https://');links.push({t:r.querySelector('.pl-t').value.trim().slice(0,40),url:s})}
   const kind=editing?editing.kind:postKind,id=editing?editing.id:(kind==='hw'?'h':'a')+now().toString(36)+hex(2);
   const prev=obj(data[kind][id]);
-  data[kind][id]=Object.assign({},prev,{title,body,links,due:kind==='hw'?($('pDue').value||''):'',by:team.nick,t:prev.t||now(),u:now()});
+  // upload new files first, so the post never points at a file that isn't there
+  const files=keptFiles.slice();
+  if(newFiles.length){
+    if(!sb||!navigator.onLine)return fail('Uploading files needs the internet. Connect and try again.');
+    $('pPost').disabled=true;
+    try{for(let i=0;i<newFiles.length;i++){const f=newFiles[i];$('pPost').textContent=`Uploading ${i+1} of ${newFiles.length}…`;
+        const path=`${team.gid}/${kind}-${id}/${now().toString(36)}-${safeName(f.name)}`;
+        const {error}=await sb.storage.from(BUCKET).upload(path,f,{contentType:mimeOf(f),upsert:false});
+        if(error)throw error;files.push({path,name:String(f.name).slice(0,120),size:f.size,type:mimeOf(f)})}}
+    catch(e){$('pPost').disabled=false;$('pPost').textContent=editing?'Save changes':'Post';await removeStored(files.slice(keptFiles.length));
+      const m=String(e&&e.message||'');return fail(/size|large|413/i.test(m)?'A file is too big. Files can be up to 10 MB.':/mime|type/i.test(m)?"That kind of file can't be uploaded.":/row-level|policy|403|unauthor/i.test(m)?'Only the teacher can upload files.':errText(e))}
+    $('pPost').disabled=false;
+  }
+  removeStored(droppedFiles);
+  data[kind][id]=Object.assign({},prev,{title,body,links,files,due:kind==='hw'?($('pDue').value||''):'',by:team.nick,t:prev.t||now(),u:now()});
   changed();resetPost();renderClass();toast(kind==='hw'?'Homework posted':'Announcement posted');
 };
 function postHTML(kind,id,p){
@@ -794,6 +845,8 @@ function postHTML(kind,id,p){
   const due=kind==='hw'?dueInfo(p.due):null,done=kind==='hw'&&stud&&isDone(id,me);
   const cls=done?'isdone':due&&due.days<0?'overdue':due&&due.days<=2?'due-soon':'';
   const links=(Array.isArray(p.links)?p.links:[]).map(l=>({t:String(obj(l).t||''),url:safeUrl(obj(l).url)})).filter(l=>l.url).slice(0,5);
+  // only files inside this group's own folder are shown
+  const files=(Array.isArray(p.files)?p.files:[]).map(f=>({path:String(obj(f).path||''),name:String(obj(f).name||'file').slice(0,120),size:+obj(f).size||0})).filter(f=>team&&f.path.startsWith(team.gid+'/')).slice(0,MAXF);
   const qs=live(data.qs).filter(([,q])=>q.on===id).sort((a,b)=>(a[1].t||0)-(b[1].t||0));
   let who='';
   if(kind==='hw'&&teach){const st=students(),dn=st.filter(s=>isDone(id,s.mid));
@@ -801,6 +854,7 @@ function postHTML(kind,id,p){
   return `<article class="post ${cls}" data-kind="${kind}" data-id="${esc(id)}">
     <div class="meta">${due?`<span class="pill ${due.days<0?'coral':due.days<=2?'amber':''}">${esc(due.text)}</span>`:''}${done?'<span class="pill glow">Done ✓</span>':''}<span>${esc(p.by||'Teacher')} · ${new Date(+p.t||now()).toLocaleDateString()}</span></div>
     <h3>${esc(String(p.title||'').slice(0,100))}</h3>${p.body?`<p class="body">${esc(String(p.body).slice(0,2000))}</p>`:''}
+    ${files.length?`<div class="links">${files.map(f=>`<button class="flink file" data-act="open" data-path="${esc(f.path)}"><span>${esc((extOf(f.name)||'file').toUpperCase())}</span>${esc(f.name)} <small class="mute">${kb(+f.size||0)}</small></button>`).join('')}</div>`:''}
     ${links.length?`<div class="links">${links.map(l=>`<a class="flink" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span>LINK</span>${esc(l.t||host(l.url))}</a>`).join('')}</div>`:''}
     ${kind==='hw'&&stud?`<div class="row"><button class="btn small ${done?'quiet':''}" data-act="done">${done?'Mark as not done':'Mark as done'}</button></div>`:''}
     ${who}
@@ -827,10 +881,15 @@ $('tab-class').addEventListener('click',e=>{
   if(act==='done'&&role()==='student'){const k=id+'|'+team.mid;data.done[k]={v:!isDone(id,team.mid),u:now()};changed();renderClass();if(data.done[k].v)toast('Nice work! ✓')}
   if(act==='ask'&&role()==='student'){const inp=post.querySelector('[data-askin]'),q=inp.value.trim().slice(0,500);if(!q)return;data.qs['q'+now().toString(36)+hex(2)]={on:id,text:q,nick:team.nick,mid:team.mid,uid:team.mid,t:now(),u:now()};changed();renderClass();toast('Question sent to your teacher')}
   if(act==='answer'&&isTeacher()){const qid=e.target.dataset.q,inp=post.querySelector(`[data-ans="${CSS.escape(qid)}"]`),a=inp.value.trim().slice(0,1000);if(!a)return;data.qs[qid]=Object.assign({},data.qs[qid],{ans:a,u:now()});changed();renderClass()}
-  if(act==='edit'&&isTeacher()){const p=data[kind][id];editing={kind,id};setKind(kind);$('postKind').hidden=true;$('pTitle').value=p.title||'';$('pBody').value=p.body||'';$('pDue').value=p.due||'';linkRows(Array.isArray(p.links)?p.links:[]);
+  if(act==='open'){const path=e.target.closest('[data-path]').dataset.path;
+    // open the tab straight away so the browser allows it, then point it at the file
+    const w=window.open('','_blank');
+    sb.storage.from(BUCKET).createSignedUrl(path,3600).then(({data:s,error})=>{if(error||!s)throw error||new Error('no link');if(w)w.location.href=s.signedUrl;else location.href=s.signedUrl})
+      .catch(err=>{if(w)w.close();toast(navigator.onLine?'This file couldn\'t be opened. It may have been removed.':'Opening files needs the internet.')});return}
+  if(act==='edit'&&isTeacher()){const p=data[kind][id];editing={kind,id};keptFiles=(Array.isArray(p.files)?p.files:[]).slice();newFiles=[];droppedFiles=[];paintFiles();setKind(kind);$('postKind').hidden=true;$('pTitle').value=p.title||'';$('pBody').value=p.body||'';$('pDue').value=p.due||'';linkRows(Array.isArray(p.links)?p.links:[]);
     $('pCancel').hidden=false;$('pPost').textContent='Save changes';$('postTitle').textContent='Edit '+(kind==='hw'?'homework':'announcement');$('postCard').scrollIntoView({behavior:'smooth'})}
   if(act==='del'&&isTeacher()){if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Tap again to delete';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Delete'}},2500);return}
-    data[kind][id]={deleted:true,u:now()};changed();renderClass()}
+    removeStored(obj(data[kind][id]).files);data[kind][id]={deleted:true,u:now()};changed();renderClass()}
 });
 $('tab-class').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.ask input')){e.preventDefault();e.target.parentElement.querySelector('button').click()}});
 resetPost();setKind('hw');

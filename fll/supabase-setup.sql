@@ -264,3 +264,39 @@ grant select, insert, update, delete on public.bc_votes to authenticated;
 grant execute on function public.bc_create(text, text, text) to authenticated;
 grant execute on function public.bc_join(text, text, text) to authenticated;
 grant execute on function public.bc_role(uuid) to authenticated;
+
+-- ======================================================================
+-- FLL Pit Crew: files on homework and announcements (Supabase Storage).
+-- A private bucket. Files are stored as <group id>/<post>/<file name>.
+-- Group members can open them; only the group's teacher can add or remove them.
+-- ======================================================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('class-files', 'class-files', false, 10485760, array[
+  'application/pdf', 'text/plain',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- The group a file belongs to: the first folder of its path.
+create or replace function public.file_group(object_name text) returns uuid
+language sql immutable as $$
+  select case when split_part(object_name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then split_part(object_name, '/', 1)::uuid end
+$$;
+grant execute on function public.file_group(text) to authenticated;
+
+drop policy if exists class_files_read on storage.objects;
+drop policy if exists class_files_add on storage.objects;
+drop policy if exists class_files_change on storage.objects;
+drop policy if exists class_files_remove on storage.objects;
+create policy class_files_read on storage.objects for select to authenticated
+  using (bucket_id = 'class-files' and public.my_role(public.file_group(name)) is not null);
+create policy class_files_add on storage.objects for insert to authenticated
+  with check (bucket_id = 'class-files' and public.my_role(public.file_group(name)) = 'teacher');
+create policy class_files_change on storage.objects for update to authenticated
+  using (bucket_id = 'class-files' and public.my_role(public.file_group(name)) = 'teacher')
+  with check (bucket_id = 'class-files' and public.my_role(public.file_group(name)) = 'teacher');
+create policy class_files_remove on storage.objects for delete to authenticated
+  using (bucket_id = 'class-files' and public.my_role(public.file_group(name)) = 'teacher');
