@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07211f">
+<title>FLL Pit Crew Kurulumu</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@400;600;700&display=swap">
+<style>
+/* Layout: one readable column of numbered setup steps, with the SQL in a copyable box. Same night-rainforest look as the app. */
+:root{--night:#07211f;--panel:#0d302c;--line:#1f5a4f;--ink:#e9fbf3;--mute:#93c1b3;--glow:#5cf2b4;--leaf:#c3e88d;--amber:#ffc857;--coral:#ff7a6b;
+  --display:'Fredoka',ui-rounded,system-ui,sans-serif;--body:'Nunito',system-ui,sans-serif;color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2{font-family:var(--display);font-weight:700;margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(28px,6vw,38px);color:var(--glow)}
+h2{font-size:21px}
+p{margin:0}
+.lang{display:flex;gap:6px;align-self:flex-start}
+.lang button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:5px 14px;font:inherit;font-weight:700;cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--glow);color:#032019;border-color:var(--glow)}
+.intro{color:var(--mute)}
+.why{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+ol.steps>li{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;counter-increment:s;position:relative}
+ol.steps>li h2::before{content:counter(s);display:inline-grid;place-items:center;width:32px;height:32px;border-radius:10px;background:var(--leaf);color:#0c2a12;margin-right:10px;font-size:18px}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+b.ui{background:var(--night);border:1px solid var(--line);border-radius:6px;padding:0 6px;font-weight:700;white-space:nowrap}
+code{font-family:ui-monospace,Menlo,monospace;font-size:15px;background:var(--night);border-radius:6px;padding:1px 6px;word-break:break-all}
+.copyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;background:var(--glow);color:#032019}
+.btn.quiet{background:var(--night);color:var(--ink);border:1px solid var(--line)}
+pre{margin:0;max-height:260px;overflow:auto;background:var(--night);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;line-height:1.5;white-space:pre}
+.warn{border-left:4px solid var(--coral);background:rgba(255,122,107,.08);border-radius:8px;padding:10px 12px}
+.ok{border-left:4px solid var(--glow);background:rgba(92,242,180,.08);border-radius:8px;padding:10px 12px}
+.note{color:var(--mute);font-size:15px}
+a{color:var(--glow)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lang" role="group" aria-label="Dil / Language"><button data-l="tr" aria-pressed="true">Türkçe</button><button data-l="en" aria-pressed="false">English</button></div>
+
+  <!-- TÜRKÇE -->
+  <div lang="tr" id="tr" style="display:flex;flex-direction:column;gap:18px">
+    <h1>FLL Pit Crew: öğretmen kurulumu</h1>
+    <p class="intro">Öğrencinizin takım için hazırladığı FLL Pit Crew uygulaması, ödevleri, duyuruları ve robot denemelerini tüm sınıfla paylaşmak için ücretsiz bir Supabase hesabına ihtiyaç duyuyor. Kurulum yaklaşık 10 dakika sürer, kredi kartı gerekmez.</p>
+    <div class="why"><b>Neden gerekli?</b><p>Uygulama şu anda verileri sadece her cihazın kendisinde tutuyor. Supabase, sınıfın verilerini güvenli bir şekilde çevrimiçi saklar. Ödev ve duyuruları yalnızca sizin hesabınız ekleyebilir; bu kuralları veritabanının kendisi uygular.</p></div>
+    <ol class="steps">
+      <li><h2>Ücretsiz hesap açın</h2>
+        <p><a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">supabase.com</a> adresine gidin ve e-posta adresinizle (veya GitHub hesabınızla) kaydolun. E-postanıza gelen onay bağlantısına tıklayın.</p></li>
+      <li><h2>Yeni bir proje oluşturun</h2>
+        <ul><li><b class="ui">New project</b> düğmesine tıklayın. Plan olarak <b>Free</b> seçili kalsın.</li>
+          <li><b>Name:</b> <code>FLL Pit Crew</code></li>
+          <li><b>Database password:</b> <b class="ui">Generate a password</b> ile bir şifre oluşturun ve güvenli bir yere kaydedin. Bu şifreyi kimseyle paylaşmayın; uygulama için gerekmez.</li>
+          <li><b>Region:</b> Türkiye'ye en yakın olan <b>Central EU (Frankfurt)</b>.</li>
+          <li><b class="ui">Create new project</b> düğmesine tıklayın ve projenin hazırlanması için 1–2 dakika bekleyin.</li></ul></li>
+      <li><h2>Öğrenci cihazlarının e-postasız girişini açın</h2>
+        <p>Öğrenciler ve takım bilgisayarı e-posta kullanmadan, sadece grup koduyla katılır.</p>
+        <ul><li>Soldaki menüden <b class="ui">Authentication</b> → <b class="ui">Sign In / Providers</b> sayfasını açın.</li>
+          <li><b>Allow anonymous sign-ins</b> seçeneğini açın ve <b class="ui">Save changes</b> ile kaydedin.</li></ul></li>
+      <li><h2>Uygulamanın adresini girin</h2>
+        <p>Böylece e-posta onay bağlantıları doğrudan uygulamayı açar.</p>
+        <ul><li><b class="ui">Authentication</b> → <b class="ui">URL Configuration</b> sayfasını açın.</li>
+          <li><b>Site URL</b> alanına şunu yazın ve kaydedin:</li></ul>
+        <div class="copyrow"><code id="siteTr">https://kuzeyozer.github.io/kuzey-arcade/fll/</code><button class="btn quiet" data-copy="siteTr">Kopyala</button></div></li>
+      <li><h2>Veritabanı kurulumunu çalıştırın</h2>
+        <ul><li>Soldaki menüden <b class="ui">SQL Editor</b> sayfasını açın ve <b class="ui">New query</b> deyin.</li>
+          <li>Aşağıdaki kodun tamamını kopyalayıp yapıştırın ve <b class="ui">Run</b> düğmesine tıklayın.</li>
+          <li>Sonuçta <b>Success. No rows returned</b> yazısını görmelisiniz. Uyarı (notice) çıkarsa sorun değil.</li></ul>
+        <div class="copyrow"><button class="btn" data-copy="sql">Kodun tamamını kopyala</button><span class="note">Bu kod yalnızca FLL Pit Crew'un kendi tablolarını ve güvenlik kurallarını oluşturur. Tekrar çalıştırmak zararsızdır.</span></div>
+        <pre id="sql">Yükleniyor…</pre></li>
+      <li><h2>İki bilgiyi öğrencinize gönderin</h2>
+        <ul><li>Sayfanın üstündeki <b class="ui">Connect</b> düğmesine tıklayın veya <b class="ui">Project Settings</b> → <b class="ui">API Keys</b> sayfasını açın.</li>
+          <li><b>Project URL</b>: <code>https://xxxxxxxx.supabase.co</code> şeklinde bir adres.</li>
+          <li><b>Publishable key</b>: <code>sb_publishable_</code> ile başlayan anahtar (eski projelerde <b>anon public</b> adlı, <code>eyJ</code> ile başlayan anahtar).</li></ul>
+        <div class="ok">Bu iki bilgi zaten herkese açık olacak şekilde tasarlanmıştır; uygulamanın içine yerleştirilecekler. Güvenliği, 5. adımda kurulan kurallar sağlar.</div>
+        <div class="warn"><b>Asla paylaşmayın:</b> veritabanı şifresi ve <code>sb_secret_</code> ile başlayan gizli anahtar (eski adıyla <b>service_role</b>).</div></li>
+    </ol>
+    <div class="why"><b>Sonrasında</b><ul>
+      <li>Öğrenciniz bu iki bilgiyi uygulamaya ekletecek. Ardından uygulamada <b>Öğretmen olarak giriş</b> ile e-postanız ve bir şifreyle hesabınızı oluşturup grubu başlatacaksınız.</li>
+      <li>Ücretsiz projeler 7 gün hiç kullanılmazsa duraklatılır. Böyle olursa Supabase panelinde projeye girip <b class="ui">Restore project</b> demeniz yeterlidir; veriler kaybolmaz.</li>
+      <li>Sınıf verileri bu projede, sizin hesabınızda durur. İstediğiniz zaman projeyi silerek tüm verileri kaldırabilirsiniz.</li></ul></div>
+  </div>
+
+  <!-- ENGLISH -->
+  <div lang="en" id="en" hidden style="display:flex;flex-direction:column;gap:18px">
+    <h1>FLL Pit Crew: teacher setup</h1>
+    <p class="intro">Your student built the FLL Pit Crew app for your team. To share homework, announcements and robot runs with the whole class, it needs a free Supabase account. Setup takes about 10 minutes, and no credit card is needed.</p>
+    <div class="why"><b>Why is this needed?</b><p>Right now the app only keeps data on each device. Supabase stores the class's data safely online. Only your account can post homework and announcements, and the database itself enforces that rule.</p></div>
+    <ol class="steps">
+      <li><h2>Create a free account</h2>
+        <p>Go to <a href="https://supabase.com/dashboard/sign-up" target="_blank" rel="noopener">supabase.com</a> and sign up with your email (or a GitHub account). Click the confirmation link in your email.</p></li>
+      <li><h2>Create a new project</h2>
+        <ul><li>Click <b class="ui">New project</b>. Keep the <b>Free</b> plan.</li>
+          <li><b>Name:</b> <code>FLL Pit Crew</code></li>
+          <li><b>Database password:</b> click <b class="ui">Generate a password</b> and save it somewhere safe. Don't share it with anyone; the app doesn't need it.</li>
+          <li><b>Region:</b> <b>Central EU (Frankfurt)</b>, the closest to Turkey.</li>
+          <li>Click <b class="ui">Create new project</b> and wait 1–2 minutes while it's prepared.</li></ul></li>
+      <li><h2>Let student devices join without email</h2>
+        <p>Students and the team computer join with just the group code, without an email address.</p>
+        <ul><li>In the left menu open <b class="ui">Authentication</b> → <b class="ui">Sign In / Providers</b>.</li>
+          <li>Turn on <b>Allow anonymous sign-ins</b> and click <b class="ui">Save changes</b>.</li></ul></li>
+      <li><h2>Enter the app's address</h2>
+        <p>This makes email confirmation links open the app.</p>
+        <ul><li>Open <b class="ui">Authentication</b> → <b class="ui">URL Configuration</b>.</li>
+          <li>Set <b>Site URL</b> to this and save:</li></ul>
+        <div class="copyrow"><code id="siteEn">https://kuzeyozer.github.io/kuzey-arcade/fll/</code><button class="btn quiet" data-copy="siteEn">Copy</button></div></li>
+      <li><h2>Run the database setup</h2>
+        <ul><li>In the left menu open <b class="ui">SQL Editor</b> and click <b class="ui">New query</b>.</li>
+          <li>Copy all of the code below, paste it in, and click <b class="ui">Run</b>.</li>
+          <li>You should see <b>Success. No rows returned</b>. Notices are fine.</li></ul>
+        <div class="copyrow"><button class="btn" data-copy="sql2">Copy all the code</button><span class="note">It only creates FLL Pit Crew's own tables and security rules. Running it again is harmless.</span></div>
+        <pre id="sql2">Loading…</pre></li>
+      <li><h2>Send two things to your student</h2>
+        <ul><li>Click the <b class="ui">Connect</b> button at the top of the page, or open <b class="ui">Project Settings</b> → <b class="ui">API Keys</b>.</li>
+          <li><b>Project URL</b>: an address like <code>https://xxxxxxxx.supabase.co</code>.</li>
+          <li><b>Publishable key</b>: the key starting with <code>sb_publishable_</code> (in older projects, the <b>anon public</b> key starting with <code>eyJ</code>).</li></ul>
+        <div class="ok">These two are designed to be public; they'll be built into the app. The rules from step 5 are what keep the data safe.</div>
+        <div class="warn"><b>Never share:</b> the database password, or the secret key starting with <code>sb_secret_</code> (called <b>service_role</b> in older projects).</div></li>
+    </ol>
+    <div class="why"><b>Afterwards</b><ul>
+      <li>Your student will have these two added to the app. Then, in the app, you'll use <b>Sign in as teacher</b> to create your account with your email and a password, and start the group.</li>
+      <li>Free projects pause after 7 days without any use. If that happens, open the project in Supabase and click <b class="ui">Restore project</b>; no data is lost.</li>
+      <li>The class's data lives in this project, in your account. You can remove all of it at any time by deleting the project.</li></ul></div>
+  </div>
+</div>
+<script>
+(()=>{
+  const $=id=>document.getElementById(id);
+  fetch('supabase-setup.sql',{cache:'no-store'}).then(r=>r.ok?r.text():Promise.reject()).then(t=>{$('sql').textContent=t;$('sql2').textContent=t})
+    .catch(()=>{const m='The setup code could not load. Open kuzeyozer.github.io/kuzey-arcade/fll/supabase-setup.sql instead.';$('sql').textContent=m;$('sql2').textContent=m});
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+    const text=$(b.dataset.copy).textContent,label=b.textContent;
+    const done=()=>{b.textContent=document.documentElement.lang==='en'?'Copied!':'Kopyalandı!';setTimeout(()=>b.textContent=label,1600)};
+    const select=()=>{const r=document.createRange();r.selectNodeContents($(b.dataset.copy));const s=getSelection();s.removeAllRanges();s.addRange(r)};
+    try{navigator.clipboard.writeText(text).then(done,select)}catch(e){select()}
+  });
+  const setLang=l=>{$('tr').hidden=l!=='tr';$('en').hidden=l!=='en';document.documentElement.lang=l;document.title=l==='en'?'FLL Pit Crew Setup':'FLL Pit Crew Kurulumu';
+    document.querySelectorAll('.lang button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.l===l)));try{localStorage.setItem('fll:setupLang',l)}catch(e){}};
+  document.querySelectorAll('.lang button').forEach(b=>b.onclick=()=>setLang(b.dataset.l));
+  try{const l=localStorage.getItem('fll:setupLang');if(l)setLang(l)}catch(e){}
+})();
+</script>
+</body>
+</html>
