@@ -98,8 +98,9 @@ alter table public.items enable row level security;
 drop policy if exists groups_read on public.groups;
 drop policy if exists groups_create on public.groups;
 drop policy if exists groups_rename on public.groups;
+-- The teacher can always see their own groups (needed the moment a group is created).
 create policy groups_read on public.groups for select
-  using (public.my_role(id) is not null);
+  using (teacher = auth.uid() or public.my_role(id) is not null);
 -- Only real (not anonymous) accounts can start a group, and only for themselves.
 create policy groups_create on public.groups for insert
   with check (teacher = auth.uid() and not coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false));

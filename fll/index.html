@@ -357,7 +357,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px}
     <div class="card"><h2>Homework</h2><div class="posts" id="hwList"></div></div>
     <div class="card"><h2>Announcements</h2><div class="posts" id="annList"></div></div>
   </section>
-  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 2</span></footer>
+  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 3</span></footer>
 </main>
 
 <nav class="tabs" aria-label="Sections">
@@ -378,6 +378,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px}
 <div class="mini" id="mini" hidden><div class="in"><span class="t" id="miniClock">2:30</span><span class="s"><small>Score</small><span id="miniScore">0</span></span><button class="btn small" id="miniBtn">Start</button></div></div>
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
@@ -422,7 +423,8 @@ function blank(){return{v:1,teamName:'',matchSec:150,runs:{},plans:{},checks:{},
 const MAPS=['runs','plans','checks','hw','ann','done','qs','members'];
 try{const s=JSON.parse(localStorage.getItem('fll:data')||'null');if(s&&s.v===1)data=Object.assign(blank(),s)}catch(e){}
 let team=null;try{team=JSON.parse(localStorage.getItem('fll:team')||'null')}catch(e){}
-if(team&&!team.role)team.role='computer';
+// groups from before Supabase used a different code, so they can't be opened any more
+let oldGroup=false;if(team&&!team.gid){team=null;oldGroup=true;try{localStorage.removeItem('fll:team')}catch(e){}}
 const saveLocal=()=>{try{localStorage.setItem('fll:data',JSON.stringify(data))}catch(e){}};
 const saveTeam=()=>{try{team?localStorage.setItem('fll:team',JSON.stringify(team)):localStorage.removeItem('fll:team')}catch(e){}};
 // newest change wins, per run, per plan, per checklist line
@@ -442,40 +444,84 @@ function merge(a,b){
 }
 const live=m=>Object.entries(obj(m)).filter(([,x])=>x&&!x.deleted);
 
-/* ---------- sharing (free storage, ~50 requests a day per device) ---------- */
-const API='https://api.restful-api.dev/objects/',KIND='fll-pitcrew';
-class SyncError extends Error{}
-const ERR={offline:'You seem to be offline. Changes are saved on this device and will sync later.',limit:'The free storage has reached today\'s limit on this device. Changes are kept here and will sync tomorrow.',
-  missing:'No team was found with that code. Check the code and try again.',server:'The storage didn\'t answer. Changes are kept on this device; try again in a minute.'};
-const errText=e=>ERR[e&&e.message]||ERR.server;
-async function api(method,id,body){
-  let r;try{r=await fetch(API+(id||''),{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(e){throw new SyncError('offline')}
-  if(r.status===404||r.status===400)throw new SyncError('missing');if(r.status===429)throw new SyncError('limit');if(!r.ok)throw new SyncError('server');
-  return r.json();
-}
-const fmtCode=id=>String(id).toUpperCase().match(/.{1,4}/g).join('-');
-const parseCode=s=>{const m=String(s||'').replace(/^.*#team=/,'').replace(/[^0-9a-f]/gi,'').toLowerCase();return /^[0-9a-f]{16,64}$/.test(m)?m:null};
+/* ---------- sharing: the teacher's Supabase project ---------- */
+const SB_URL='https://ahdidgzraaisooduipkt.supabase.co',SB_KEY='sb_publishable_PMvvVoPQYgi9Awd4kmtz-Q_is5vBUfn';
+const APP_URL='https://kuzeyozer.github.io/kuzey-arcade/fll/';
+const sb=window.supabase?window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+const KINDS={run:'runs',plan:'plans',check:'checks',hw:'hw',ann:'ann',done:'done',q:'qs'};
+const ERR={offline:'You seem to be offline. Changes are saved on this device and will sync when you\'re back online.',missing:'No group was found with that code. Check the code and try again.',
+  nolib:'Sharing couldn\'t load. Check your internet connection and reload the app.',server:'The group storage didn\'t answer. Changes are kept on this device; try again in a minute.'};
+const errText=e=>{const m=String(e&&e.message||e||'');if(/no group with that code/i.test(m))return ERR.missing;if(/fetch|network|offline|load failed/i.test(m)||!navigator.onLine)return ERR.offline;return ERR[m]||ERR.server};
+const fmtCode=c=>{c=String(c||'').toUpperCase();return c.length===8?c.slice(0,4)+'-'+c.slice(4):c};
+const parseCode=s=>{const m=String(s||'').replace(/^.*#team=/,'').replace(/[^0-9a-z]/gi,'').toUpperCase();return /^[0-9A-F]{8}$/.test(m)?m:null};
 let syncState='',lastSync=0,dirty=false,syncTimer=null,syncing=false;
-const sortKeys=o=>Object.keys(o).sort().map(k=>[k,o[k]]);
-async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-async function readTeam(id){const o=await api('GET',id);if(!o||o.name!==KIND||obj(o.data).v!==1)throw new SyncError('missing');return o.data}
+// what the group storage last had for each item, so only real changes are sent
+let synced={};try{synced=JSON.parse(localStorage.getItem('fll:synced')||'{}')||{}}catch(e){}
+const saveSynced=()=>{try{localStorage.setItem('fll:synced',JSON.stringify(synced))}catch(e){}};
+const canon=v=>Array.isArray(v)?v.map(canon):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canon(v[k])])):v;
+const strip=x=>{const o=Object.assign({},obj(x));delete o.u;delete o.deleted;return o};
+const sigOf=(d,del)=>JSON.stringify([canon(d),!!del]);
+function localItems(){
+  const out=[];
+  for(const [kind,key] of Object.entries(KINDS))for(const [id,x] of Object.entries(obj(data[key])))out.push({kind,id,d:strip(x),del:!!obj(x).deleted,u:+obj(x).u||0});
+  out.push({kind:'project',id:'main',d:strip(data.project),del:false,u:+obj(data.project).u||0});
+  out.push({kind:'settings',id:'main',d:{matchSec:data.matchSec},del:false,u:+data.setU||0});
+  return out;
+}
+// mirrors the database rules, so this device only sends what it may change
+function mayWrite(it){
+  const r=team&&team.role;
+  if(r==='teacher')return true;
+  if(r==='computer')return ['run','plan','check','project','settings'].includes(it.kind);
+  if(r==='student')return(it.kind==='done'&&it.id.endsWith('|'+team.mid))||(it.kind==='q'&&it.d.uid===team.mid&&!('ans' in it.d)&&!synced['q/'+it.id]);
+  return false;
+}
+function applyRow(row){
+  const d=obj(row.data),u=Date.parse(row.updated_at)||now();
+  if(row.kind==='project'){data.project=Object.assign({},d,{u});return}
+  if(row.kind==='settings'){if(+d.matchSec)data.matchSec=+d.matchSec;data.setU=u;return}
+  const key=KINDS[row.kind];if(!key)return;
+  data[key][row.id]=row.deleted?{deleted:true,u}:Object.assign({},d,{u});
+}
 async function sync(){
-  if(!team||syncing)return;syncing=true;setTeamBtn('Syncing…');
+  if(!team||syncing)return;if(!sb){syncState=ERR.nolib;setTeamBtn();return}
+  syncing=true;setTeamBtn('Syncing…');
   try{
-    const remote=await readTeam(team.id);
-    const merged=merge(remote,data);
-    const core=d=>JSON.stringify([...MAPS.map(k=>sortKeys(obj(d[k]))),sortKeys(obj(d.project)),d.matchSec,d.teacherHash||'',d.teamName||'']);
-    const changed=core(merged)!==core(Object.assign(blank(),remote));
-    if(changed){merged.updatedAt=now();await api('PUT',team.id,{name:KIND,data:merged})}
-    data=merged;saveLocal();dirty=false;lastSync=now();syncState='';
-  }catch(e){syncState=errText(e)}
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session||session.user.id!==team.mid)throw new Error('Please join the group again on this device.');
+    const [g,m]=await Promise.all([sb.from('groups').select('name,code,teacher').eq('id',team.gid).maybeSingle(),sb.from('members').select('user_id,nick,role').eq('group_id',team.gid)]);
+    if(g.error)throw g.error;if(m.error)throw m.error;
+    if(!g.data)throw new Error('This group was deleted, or you were removed from it.');
+    data.teamName=g.data.name;team.code=g.data.code;
+    data.members=Object.fromEntries(m.data.map(x=>[x.user_id,{nick:x.nick,role:x.role}]));
+    const me=data.members[team.mid];if(!me)throw new Error('You were removed from this group. Ask the teacher for the code to join again.');
+    team.role=me.role;team.nick=me.nick;saveTeam();
+    // 1. read everything the group has
+    const server={};
+    for(let from=0;;from+=1000){
+      const {data:rows,error}=await sb.from('items').select('kind,id,data,deleted,updated_at').eq('group_id',team.gid).order('kind').order('id').range(from,from+999);
+      if(error)throw error;rows.forEach(r=>server[r.kind+'/'+r.id]=r);if(rows.length<1000)break;
+    }
+    // 2. send this device's changes, unless someone saved a newer version
+    const out=localItems().filter(it=>{const k=it.kind+'/'+it.id,srv=server[k];
+      return sigOf(it.d,it.del)!==synced[k]&&mayWrite(it)&&!(srv&&Date.parse(srv.updated_at)>=it.u)&&!(srv&&sigOf(obj(srv.data),srv.deleted)===sigOf(it.d,it.del))});
+    const sent=new Set();
+    for(let i=0;i<out.length;i+=200){
+      const part=out.slice(i,i+200);
+      const {error}=await sb.from('items').upsert(part.map(it=>({group_id:team.gid,kind:it.kind,id:it.id,data:it.d,deleted:it.del,updated_by:team.mid,updated_at:new Date(it.u||now()).toISOString()})),{onConflict:'group_id,kind,id'});
+      if(error)throw error;part.forEach(it=>{const k=it.kind+'/'+it.id;synced[k]=sigOf(it.d,it.del);sent.add(k)});
+    }
+    // 3. take everyone else's changes
+    for(const [k,row] of Object.entries(server)){if(sent.has(k))continue;applyRow(row);synced[k]=sigOf(obj(row.data),row.deleted)}
+    saveSynced();saveLocal();dirty=false;lastSync=now();syncState='';
+  }catch(e){syncState=errText(e);if(/join the group again|removed|deleted/.test(String(e.message)))syncState=e.message}
   syncing=false;await applyRoles();setTeamBtn();renderAll();
 }
-// wait a few seconds after changes so several taps share one sync
-function changed(){data.updatedAt=now();saveLocal();if(!team)return;dirty=true;setTeamBtn();clearTimeout(syncTimer);syncTimer=setTimeout(sync,6000)}
+// wait a moment after changes so several taps share one sync
+function changed(){data.updatedAt=now();saveLocal();if(!team)return;dirty=true;setTeamBtn();clearTimeout(syncTimer);syncTimer=setTimeout(sync,2500)}
 function setTeamBtn(busy){
   const b=$('teamBtn');b.classList.toggle('on',!!team);
-  $('teamLabel').textContent=team?(busy||(syncState?'Not synced':dirty?'Saving soon…':(data.teamName||'Group')+' · '+ROLE_NAME[role()])):'Join or start a group';
+  $('teamLabel').textContent=team?(busy||(syncState?'Not synced':dirty?'Saving…':(data.teamName||'Group')+' · '+ROLE_NAME[role()])):'Join or start a group';
 }
 
 /* ---------- who can do what ---------- */
@@ -485,7 +531,8 @@ const role=()=>team?(team.role||'computer'):'solo';
 const isTeacher=()=>role()==='teacher'&&teacherOK;
 const canEdit=()=>!team||role()==='computer'||isTeacher();
 const ROLE_NAME={teacher:'Teacher',computer:'Computer',student:'Student'};
-async function applyRoles(){teacherOK=!!(team&&team.key&&data.teacherHash&&data.teacherHash===await sha(team.key));paintRoles()}
+// the database decides roles; this only shows the right buttons
+async function applyRoles(){teacherOK=!!(team&&team.role==='teacher');paintRoles()}
 function paintRoles(){
   const ro=!canEdit();
   document.body.classList.toggle('ro',ro);document.body.classList.toggle('is-teacher',isTeacher());
@@ -778,7 +825,7 @@ function badge(){const st=role()==='student'&&team;const n=st?live(data.hw).filt
 $('tab-class').addEventListener('click',e=>{
   const act=e.target.dataset.act;if(!act)return;const post=e.target.closest('.post');if(!post||!team)return;const kind=post.dataset.kind,id=post.dataset.id;
   if(act==='done'&&role()==='student'){const k=id+'|'+team.mid;data.done[k]={v:!isDone(id,team.mid),u:now()};changed();renderClass();if(data.done[k].v)toast('Nice work! ✓')}
-  if(act==='ask'&&role()==='student'){const inp=post.querySelector('[data-askin]'),q=inp.value.trim().slice(0,500);if(!q)return;data.qs['q'+now().toString(36)+hex(2)]={on:id,text:q,nick:team.nick,mid:team.mid,t:now(),u:now()};changed();renderClass();toast('Question sent to your teacher')}
+  if(act==='ask'&&role()==='student'){const inp=post.querySelector('[data-askin]'),q=inp.value.trim().slice(0,500);if(!q)return;data.qs['q'+now().toString(36)+hex(2)]={on:id,text:q,nick:team.nick,mid:team.mid,uid:team.mid,t:now(),u:now()};changed();renderClass();toast('Question sent to your teacher')}
   if(act==='answer'&&isTeacher()){const qid=e.target.dataset.q,inp=post.querySelector(`[data-ans="${CSS.escape(qid)}"]`),a=inp.value.trim().slice(0,1000);if(!a)return;data.qs[qid]=Object.assign({},data.qs[qid],{ans:a,u:now()});changed();renderClass()}
   if(act==='edit'&&isTeacher()){const p=data[kind][id];editing={kind,id};setKind(kind);$('postKind').hidden=true;$('pTitle').value=p.title||'';$('pBody').value=p.body||'';$('pDue').value=p.due||'';linkRows(Array.isArray(p.links)?p.links:[]);
     $('pCancel').hidden=false;$('pPost').textContent='Save changes';$('postTitle').textContent='Edit '+(kind==='hw'?'homework':'announcement');$('postCard').scrollIntoView({behavior:'smooth'})}
@@ -789,67 +836,104 @@ $('tab-class').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.match
 resetPost();setKind('hw');
 
 /* ---------- team code ---------- */
+function authMsg(e){const m=String(e&&e.message||e||'');
+  if(/invalid login/i.test(m))return'Wrong email or password.';if(/not confirmed/i.test(m))return'Confirm your email first: open the link we sent you, then sign in.';
+  if(/already registered|already been registered/i.test(m))return'This email already has an account. Tap "Sign in" instead.';
+  if(/password/i.test(m)&&/6|short|least/i.test(m))return'Use a password with at least 6 characters.';if(/rate limit|too many/i.test(m))return'Too many tries. Wait a few minutes and try again.';
+  if(/anonymous/i.test(m))return'Joining without email is turned off in the group storage. The teacher needs to turn on "Allow anonymous sign-ins" in Supabase.';
+  return errText(e)}
+async function currentUser(){if(!sb)return null;const {data:{session}}=await sb.auth.getSession();return session?session.user:null}
+async function ensureUser(){let u=await currentUser();if(u)return u;const {data,error}=await sb.auth.signInAnonymously();if(error)throw error;return data.user}
+async function enterGroup(gid,code,nick,uid,r,fresh){
+  team={gid,code,nick,mid:uid,role:r};saveTeam();synced={};saveSynced();
+  if(fresh){data=blank();saveLocal()}
+  await sync();await applyRoles();setTeamBtn();renderAll();renderTeamSheet();
+}
 function renderTeamSheet(){
   const b=$('teamBody');
+  if(!sb){b.innerHTML=`<div><h2>Your group</h2><p class="err">${ERR.nolib}</p></div>`;return}
   if(!team){
     const nick=String(localStorage.getItem('fll:nick')||'');
     b.innerHTML=`<div><h2>Your group</h2><p class="mute">The teacher starts the group and shares its code. Students join to see everything and do their homework. The team computer joins with the same code to run matches and edit.</p></div>
+      ${oldGroup?'<p class="err">Groups moved to a new, safer storage, so your old group code no longer works. Ask your teacher for the new code.</p>':''}
       <div class="card"><h3>Join your group</h3>
-        <label class="field">Group code<input type="text" id="jCode" autocomplete="off" autocapitalize="characters" placeholder="Paste the code or invite link" value="${esc(prefill)}"></label>
+        <label class="field">Group code<input type="text" id="jCode" autocomplete="off" autocapitalize="characters" maxlength="60" placeholder="ABCD-1234, or paste the invite link" value="${esc(prefill)}"></label>
         <label class="field">Your name or nickname<input type="text" id="jNick" maxlength="20" value="${esc(nick)}"></label>
         <div class="field">This device is…<div class="rolepick">
           <label><input type="radio" name="jRole" value="student" checked><span><b>A student</b><small>See everything, do homework, ask questions</small></span></label>
           <label><input type="radio" name="jRole" value="computer"><span><b>The team computer</b><small>Run matches and edit runs, plans and notes</small></span></label></div></div>
-        <details><summary>I'm the teacher, joining on another device</summary><label class="field" style="margin-top:8px">Teacher key<input type="text" id="jKey" autocomplete="off"></label></details>
-        <button class="btn" id="jGo">Join the group</button></div>
-      <div class="card"><h3>Start a new group (teachers)</h3>
-        <label class="field">Group name<input type="text" id="cName" maxlength="40" placeholder="Our FLL team"></label>
-        <label class="field">Your name<input type="text" id="cNick" maxlength="20" value="${esc(nick)}"></label>
-        <p class="small mute" style="margin:0">You'll be the teacher and get a secret teacher key. Runs, plans and notes already on this device go into the new group.</p>
-        <button class="btn" id="cGo">Start the group</button></div>
-      <p class="err" id="tErr" hidden></p>
-      <p class="small mute">Group data is kept on a free online storage service. Anyone with the code can see it, so only share it with your class, and don't write private things.</p>`;
-    const fail=m=>{$('tErr').hidden=false;$('tErr').textContent=m};
-    $('jGo').onclick=async()=>{const code=parseCode($('jCode').value),nick=$('jNick').value.trim().slice(0,20),key=$('jKey').value.trim();
-      let r=(document.querySelector('input[name="jRole"]:checked')||{}).value||'student';
-      if(!code)return fail('Paste the group code or invite link first. It looks like FF80-8181-…');if(!nick)return fail('Type your name or nickname.');
+        <button class="btn" id="jGo">Join the group</button>
+        <p class="err" id="jErr" hidden></p></div>
+      <div class="card" id="teachBox"><h3>Teachers</h3><p class="small mute" style="margin:0">Loading…</p></div>
+      <p class="small mute">Group data is kept in the teacher's Supabase project. Only people who join with the code can see it.</p>`;
+    $('jGo').onclick=async()=>{const fail=m=>{$('jErr').hidden=false;$('jErr').textContent=m};
+      const code=parseCode($('jCode').value),nick=$('jNick').value.trim().slice(0,20),r=(document.querySelector('input[name="jRole"]:checked')||{}).value||'student';
+      if(!code)return fail('Type the 8-letter group code, like ABCD-1234, or paste the invite link.');if(!nick)return fail('Type your name or nickname.');
       try{localStorage.setItem('fll:nick',nick)}catch(e){}
       $('jGo').disabled=true;$('jGo').textContent='Joining…';
-      try{const remote=await readTeam(code);
-        if(key){if(!remote.teacherHash||remote.teacherHash!==await sha(key))throw new Error('That teacher key doesn\'t match this group.');r='teacher'}
-        // a student's device starts clean so the group's data isn't mixed with someone's own practice
-        data=r==='student'?Object.assign(blank(),remote):merge(remote,data);
-        const mid=hex(6);data.members[mid]={nick,role:r,u:now()};
-        team={id:code,nick,mid,role:r,key:key||null};saveTeam();saveLocal();prefill='';await sync();renderTeamSheet();toast('You joined '+(data.teamName||'the group')+' as '+ROLE_NAME[r].toLowerCase())}
-      catch(e){fail(e instanceof SyncError?(e.message==='missing'?ERR.missing:errText(e)):e.message);$('jGo').disabled=false;$('jGo').textContent='Join the group'}};
-    $('cGo').onclick=async()=>{const name=$('cName').value.trim().slice(0,40)||'Our FLL team',nick=$('cNick').value.trim().slice(0,20);
-      if(!nick)return fail('Type your name.');try{localStorage.setItem('fll:nick',nick)}catch(e){}
-      $('cGo').disabled=true;$('cGo').textContent='Starting…';
-      try{const key=hex(10),mid=hex(6);
-        data.teamName=name;data.teacherHash=await sha(key);data.teacherU=now();data.members={[mid]:{nick,role:'teacher',u:now()}};data.updatedAt=now();
-        const o=await api('POST',null,{name:KIND,data});if(!o||!o.id)throw new SyncError('server');
-        team={id:o.id,nick,mid,role:'teacher',key};saveTeam();saveLocal();lastSync=now();syncState='';dirty=false;await applyRoles();setTeamBtn();renderAll();renderTeamSheet();toast('Group started! Save your teacher key.')}
-      catch(e){fail(errText(e));$('cGo').disabled=false;$('cGo').textContent='Start the group'}};
+      try{const u=await ensureUser();const {data:gid,error}=await sb.rpc('join_group',{join_code:code,nickname:nick,wanted:r});if(error)throw error;
+        prefill='';await enterGroup(gid,code,nick,u.id,r,r==='student');toast('You joined '+(data.teamName||'the group'))}
+      catch(e){fail(authMsg(e));$('jGo').disabled=false;$('jGo').textContent='Join the group'}};
+    renderTeacherBox();
     return;
   }
-  const mem=live(data.members).sort((a,b)=>(a[1].role===b[1].role?0:a[1].role==='teacher'?-1:b[1].role==='teacher'?1:a[1].role==='computer'?-1:1));
-  const r=role(),noTeacher=!data.teacherHash;
-  b.innerHTML=`<div><h2>${esc(data.teamName||'Your group')}</h2><p class="mute">You're in the group as <b>${esc(team.nick)}</b> · <b>${ROLE_NAME[r]}</b>${r==='teacher'&&!teacherOK?' (key doesn\'t match)':''}. ${syncState?esc(syncState):lastSync?'Synced '+ago(lastSync)+'.':''}</p></div>
-    <div class="card"><h3>Invite your class</h3><div class="codebox">${esc(fmtCode(team.id))}</div>
+  const mem=live(data.members).sort((a,b)=>(a[1].role===b[1].role?String(a[1].nick).localeCompare(String(b[1].nick)):a[1].role==='teacher'?-1:b[1].role==='teacher'?1:a[1].role==='computer'?-1:1));
+  const r=role();
+  b.innerHTML=`<div><h2>${esc(data.teamName||'Your group')}</h2><p class="mute">You're in the group as <b>${esc(team.nick)}</b> · <b>${ROLE_NAME[r]}</b>. ${syncState?esc(syncState):lastSync?'Synced '+ago(lastSync)+'.':''}</p></div>
+    <div class="card"><h3>Invite your class</h3><div class="codebox">${esc(fmtCode(team.code))}</div>
       <div class="row"><button class="btn small" id="cpLink">Copy invite link</button><button class="btn quiet small" id="cpCode">Copy code</button></div>
       <p class="small mute" style="margin:0">Students open the link, type their name and choose "A student". On the team computer, choose "The team computer". The code never changes, and each device remembers it.</p></div>
-    ${isTeacher()?`<div class="card"><h3>Your teacher key</h3><p class="small mute" style="margin:0">Keep it secret. To post from another device, join there with the code and enter this key under "I'm the teacher".</p><div class="codebox">${esc(team.key)}</div><div class="row"><button class="btn quiet small" id="cpKey">Copy teacher key</button></div></div>`:''}
-    ${noTeacher&&r!=='student'?`<div class="card"><h3>This group has no teacher yet</h3><p class="small mute" style="margin:0">It was started before Version 2. The teacher can make this device the teacher's device and get a teacher key.</p><div class="row"><button class="btn small" id="claim">Make me the teacher</button></div></div>`:''}
     <div class="card"><h3>Members (${mem.length})</h3><div class="who">${mem.map(([mid,m])=>`<span class="${mid===team.mid?'y':''}">${esc(String(m.nick||'Someone').slice(0,20))} · ${ROLE_NAME[m.role]||'Member'}</span>`).join('')||'<span>Nobody yet</span>'}</div></div>
-    <div class="row"><button class="btn quiet" id="syncNow">Sync now</button><button class="btn quiet" id="leave">Leave this group on this device</button></div>
-    <p class="small mute">The app syncs when you open it and a few seconds after you change something.${isTeacher()?' Save your teacher key before leaving, or you can\'t post again.':''}</p>`;
-  $('cpLink').onclick=e=>copy(location.origin+location.pathname+'#team='+team.id,e.target);$('cpCode').onclick=e=>copy(fmtCode(team.id),e.target);
-  if($('cpKey'))$('cpKey').onclick=e=>copy(team.key,e.target);
-  if($('claim'))$('claim').onclick=async()=>{const key=hex(10);data.teacherHash=await sha(key);data.teacherU=now();team.role='teacher';team.key=key;data.members[team.mid||(team.mid=hex(6))]={nick:team.nick,role:'teacher',u:now()};
-    saveTeam();changed();await applyRoles();renderAll();renderTeamSheet();toast('You\'re the teacher now. Save your teacher key!')};
+    <div class="row"><button class="btn quiet" id="syncNow">Sync now</button><button class="btn quiet" id="leave">Leave this group on this device</button>${r==='teacher'?'<button class="btn quiet" id="signOut">Sign out</button>':''}</div>
+    <p class="small mute">The app syncs when you open it, every half minute while it's open, and right after you change something.${r==='teacher'?' To post from another device, sign in there with the same email and password.':''}</p>`;
+  $('cpLink').onclick=e=>copy(APP_URL+'#team='+team.code,e.target);$('cpCode').onclick=e=>copy(fmtCode(team.code),e.target);
   $('syncNow').onclick=()=>sync().then(renderTeamSheet);
-  $('leave').onclick=e=>{if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Tap again to leave';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Leave this group on this device'}},3000);return}
-    team=null;saveTeam();applyRoles();setTeamBtn();renderAll();renderTeamSheet()};
+  const leave=()=>{team=null;saveTeam();synced={};saveSynced();applyRoles();setTeamBtn();renderAll();renderTeamSheet()};
+  $('leave').onclick=e=>{if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Tap again to leave';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Leave this group on this device'}},3000);return}leave()};
+  if($('signOut'))$('signOut').onclick=async()=>{await sb.auth.signOut();leave()};
+}
+async function renderTeacherBox(){
+  const box=$('teachBox');if(!box)return;
+  const u=await currentUser();if(!$('teachBox'))return;
+  if(!u||u.is_anonymous){
+    box.innerHTML=`<h3>Teachers</h3><p class="small mute" style="margin:0">Sign in with your email to start a group, or to open your group on another device. Only your account can post homework and announcements.</p>
+      <label class="field">Email<input type="email" id="tEmail" autocomplete="email" autocapitalize="off"></label>
+      <label class="field">Password<input type="password" id="tPass" autocomplete="current-password" minlength="6"></label>
+      <div class="row"><button class="btn" id="tIn">Sign in</button><button class="btn quiet" id="tUp">Create teacher account</button></div><p class="err" id="tErr" hidden></p><p class="ok" id="tOk" hidden></p>`;
+    const go=async create=>{const fail=m=>{$('tErr').hidden=false;$('tErr').textContent=m;$('tOk').hidden=true};
+      const email=$('tEmail').value.trim(),pw=$('tPass').value;if(!email||!pw)return fail('Type your email and a password.');
+      const btn=create?$('tUp'):$('tIn'),label=btn.textContent;btn.disabled=true;btn.textContent=create?'Creating…':'Signing in…';
+      try{
+        if(create){const {data:r,error}=await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:APP_URL}});if(error)throw error;
+          if(!r.session){$('tErr').hidden=true;$('tOk').hidden=false;$('tOk').textContent='Account created! We sent a link to '+email+'. Open it to confirm your email, and this app opens again.';btn.disabled=false;btn.textContent=label;return}}
+        else{const {error}=await sb.auth.signInWithPassword({email,password:pw});if(error)throw error}
+        renderTeacherBox();
+      }catch(e){fail(authMsg(e));btn.disabled=false;btn.textContent=label}};
+    $('tIn').onclick=()=>go(false);$('tUp').onclick=()=>go(true);
+    return;
+  }
+  const {data:groups,error}=await sb.from('groups').select('id,code,name').eq('teacher',u.id).order('created_at');
+  if(!$('teachBox'))return;
+  const nick=String(localStorage.getItem('fll:nick')||'');
+  box.innerHTML=`<h3>Teachers</h3><p class="small mute" style="margin:0">Signed in as <b>${esc(u.email||'teacher')}</b>.</p>
+    ${error?`<p class="err">${esc(errText(error))}</p>`:groups.length?`<div class="field">Your groups<div class="rolepick">${groups.map(g=>`<button class="btn quiet" data-open="${esc(g.id)}" data-code="${esc(g.code)}">${esc(g.name)} · ${esc(fmtCode(g.code))}</button>`).join('')}</div></div>`:''}
+    <label class="field">New group name<input type="text" id="cName" maxlength="40" placeholder="Our FLL team"></label>
+    <label class="field">Your name<input type="text" id="cNick" maxlength="20" value="${esc(nick)}" placeholder="How the class sees you"></label>
+    <p class="small mute" style="margin:0">Runs, plans and notes already on this device go into the new group.</p>
+    <div class="row"><button class="btn" id="cGo">Start the group</button><button class="btn quiet" id="tOut">Sign out</button></div><p class="err" id="cErr" hidden></p>`;
+  const fail=m=>{$('cErr').hidden=false;$('cErr').textContent=m};
+  box.querySelectorAll('[data-open]').forEach(x=>x.onclick=async()=>{x.disabled=true;
+    try{const mine=await sb.from('members').select('nick').eq('group_id',x.dataset.open).eq('user_id',u.id).maybeSingle();
+      const nk=$('cNick').value.trim().slice(0,20)||(mine.data&&mine.data.nick)||'Teacher';await sb.rpc('join_group',{join_code:x.dataset.code,nickname:nk,wanted:'teacher'});await enterGroup(x.dataset.open,x.dataset.code,nk,u.id,'teacher',false);toast('Opened '+(data.teamName||'your group'))}
+    catch(e){fail(errText(e));x.disabled=false}});
+  $('cGo').onclick=async()=>{const name=$('cName').value.trim().slice(0,40)||'Our FLL team',nk=$('cNick').value.trim().slice(0,20)||'Teacher';
+    try{localStorage.setItem('fll:nick',nk)}catch(e){}
+    $('cGo').disabled=true;$('cGo').textContent='Starting…';
+    try{const {data:g,error}=await sb.from('groups').insert({name,teacher:u.id}).select('id,code').single();if(error)throw error;
+      const j=await sb.rpc('join_group',{join_code:g.code,nickname:nk,wanted:'teacher'});if(j.error)throw j.error;
+      await enterGroup(g.id,g.code,nk,u.id,'teacher',false);toast('Group started! Share the code with your class.')}
+    catch(e){fail(errText(e));$('cGo').disabled=false;$('cGo').textContent='Start the group'}};
+  $('tOut').onclick=async()=>{await sb.auth.signOut();renderTeacherBox()};
 }
 function ago(t){const s=(now()-t)/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';return Math.floor(s/3600)+' h ago'}
 function copy(text,btn){const done=()=>{const o=btn.textContent;btn.textContent='Copied';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(text).then(done,()=>prompt('Copy this:',text))}catch(e){prompt('Copy this:',text)}}
@@ -858,7 +942,7 @@ function openTeam(){renderTeamSheet();$('teamSheet').hidden=false;document.body.
 function closeTeam(){$('teamSheet').hidden=true;document.body.style.overflow=''}
 $('teamBtn').onclick=openTeam;$('teamBack').onclick=closeTeam;
 function checkInvite(){const c=location.hash.startsWith('#team=')?parseCode(location.hash):null;if(!c)return;history.replaceState(null,'',location.pathname);
-  if(team&&team.id===c){openTeam();return}if(team){toast('Leave your current group first to join another one');openTeam();return}prefill=fmtCode(c);openTeam()}
+  if(team&&team.code===c){openTeam();return}if(team){toast('Leave your current group first to join another one');openTeam();return}prefill=fmtCode(c);openTeam()}
 addEventListener('hashchange',checkInvite);
 
 /* ---------- tabs ---------- */
@@ -871,11 +955,15 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('teamSheet').hidden)close
 function renderAll(){if(!tRun&&!countdown&&tLeft>data.matchSec)tLeft=data.matchSec;drawClock();renderPlans();renderRuns();renderProject();renderChecks();renderTopics();renderClass();paintRoles();if(!$('teamSheet').hidden)renderTeamSheet()}
 seedChecks();renderMissions();renderAll();nextQuestion();setTeamBtn();
 applyRoles().then(()=>{renderAll();setTeamBtn()});
-if(team&&!team.mid){team.mid=hex(6);saveTeam();data.members[team.mid]={nick:team.nick,role:team.role,u:now()};changed()}
+if(oldGroup)setTimeout(()=>toast('Groups moved to a safer storage. Ask your teacher for the new group code.'),800);
+// back from the email confirmation link: open the group page so the teacher can start a group
+if(sb)sb.auth.onAuthStateChange((ev,s)=>{if(ev==='SIGNED_IN'&&s&&!s.user.is_anonymous&&!team&&/type=signup|access_token/.test(location.hash+location.search)){setTimeout(()=>{openTeam();toast('Email confirmed! Now start your group.')},300)}});
+// keep in step with the group while the app is open
+setInterval(()=>{if(team&&document.visibilityState==='visible'&&!syncing)sync()},30000);
 try{const t=localStorage.getItem('fll:tab');if(t&&$('tab-'+t))showTab(t)}catch(e){}
 checkInvite();
 if(team)sync();
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(team&&now()-lastSync>120000)sync()}else if(dirty){clearTimeout(syncTimer);sync()}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(team&&now()-lastSync>15000)sync()}else if(dirty){clearTimeout(syncTimer);sync()}});
 if('serviceWorker' in navigator){
   let reloaded=false;const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!tRun){reloaded=true;location.reload()}});
