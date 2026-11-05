@@ -1,5 +1,5 @@
 // Caches the arcade so it works offline. Bump VERSION when files change.
-const VERSION = 'arcade-v1';
+const VERSION = 'arcade-v2';
 const FILES = ['./', 'index.html', 'snake.html', 'temples.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {

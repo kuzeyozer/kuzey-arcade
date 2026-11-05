@@ -1,0 +1,15 @@
+{
+  "name": "FLL Pit Crew",
+  "short_name": "Pit Crew",
+  "description": "Match timer, scorer, practice runs, run planner and team notes for FIRST LEGO League BIOGLOW.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07211f",
+  "theme_color": "#07211f",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

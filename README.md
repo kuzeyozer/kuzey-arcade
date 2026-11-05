@@ -21,3 +21,10 @@ pick, meeting date, ratings and notes on the device.
 Start a club from the club bar: the app creates one shared record on the free restful-api.dev storage
 (about 50 requests a day per device), and its id is the club code. Only the device holding the host key
 can change the shelf, pick and meeting date; every member's ratings and notes are shared.
+
+## FLL Pit Crew
+
+https://kuzeyozer.github.io/kuzey-arcade/fll/ — a FIRST LEGO League BIOGLOW (2026–2027) team app:
+match timer, live scorer built from the season score sheet, practice-run log with charts, robot run
+planner, Innovation Project notes, competition-day checklist and judge practice questions.
+A team code shares everything between teammates (same free storage as the book club).

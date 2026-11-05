@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07211f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pit Crew">
+<title>FLL Pit Crew</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap">
+<style>
+/* Layout: a pit-lane console for a night-time rainforest. Team bar on top, four tabs (Match, Runs, Plan, Team), tab bar at the bottom like a phone app. Deliberately dark only: the season glows. */
+:root{
+  --night:#07211f; --panel:#0d302c; --panel-hi:#134139; --line:#1f5a4f; --ink:#e9fbf3; --mute:#93c1b3;
+  --glow:#5cf2b4; --leaf:#c3e88d; --amber:#ffc857; --coral:#ff7a6b; --sky:#7cc7ff;
+  --display:'Fredoka', ui-rounded, system-ui, sans-serif; --body:'Nunito', system-ui, sans-serif;
+  color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+html{scroll-padding-top:calc(70px + env(safe-area-inset-top,0px));scroll-padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+body{margin:0;background:radial-gradient(ellipse at 80% -10%,#0f4a3f 0%,var(--night) 55%) fixed,var(--night);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;line-height:1.15;text-wrap:balance}
+h2{font-size:26px}
+h3{font-size:19px}
+.mute{color:var(--mute)}
+.small{font-size:14px}
+header{padding-block:16px 10px}
+header .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand img{width:38px;height:38px;border-radius:10px}
+.brand h1{font-size:22px}
+.brand p{margin:0;font-size:13px;color:var(--mute)}
+.teambtn{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:700;font-size:14px}
+.teambtn i{width:9px;height:9px;border-radius:50%;background:var(--mute)}
+.teambtn.on i{background:var(--glow);box-shadow:0 0 8px var(--glow)}
+main{padding-block:8px 24px}
+.tabpage{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:12px;padding:11px 18px;font-weight:700;cursor:pointer;background:var(--glow);color:#032019;font-family:var(--display);font-size:17px;letter-spacing:.01em}
+.btn:hover{filter:brightness(1.07)}
+.btn.quiet{background:var(--panel-hi);color:var(--ink);border:1px solid var(--line)}
+.btn.warn{background:var(--coral);color:#2a0905}
+.btn.small{padding:7px 12px;font-size:14px;border-radius:9px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+input[type=text],input[type=number],textarea,select{background:var(--night);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+textarea{min-height:90px;resize:vertical}
+label.field{display:flex;flex-direction:column;gap:4px;font-size:14px;font-weight:700;color:var(--mute)}
+label.field input,label.field textarea,label.field select{font-weight:400;color:var(--ink);font-size:16px}
+
+/* match */
+.match{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:16px;align-items:start}
+@media (max-width:860px){.match{grid-template-columns:1fr}.match .timer{position:static}}
+.mini{position:fixed;left:0;right:0;top:0;z-index:15;background:rgba(7,33,31,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mini .in{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px;height:56px}
+.mini .t{font-family:var(--display);font-size:30px;font-variant-numeric:tabular-nums;color:var(--glow)}
+.mini .t.soon{color:var(--amber)}.mini .t.end{color:var(--coral)}
+.mini .s{font-family:var(--display);font-size:22px;color:var(--leaf);font-variant-numeric:tabular-nums}
+.mini .s small{font-family:var(--body);font-size:12px;color:var(--mute);margin-right:4px}
+.mini .btn{margin-left:auto}
+.timer{position:sticky;top:calc(8px + env(safe-area-inset-top,0px));z-index:5}
+.clock{font-family:var(--display);font-weight:700;font-size:clamp(72px,16vw,132px);line-height:1;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  text-shadow:0 0 28px rgba(92,242,180,.35);color:var(--glow);transition:color .2s}
+.clock.soon{color:var(--amber);text-shadow:0 0 28px rgba(255,200,87,.4)}
+.clock.end{color:var(--coral);text-shadow:0 0 28px rgba(255,122,107,.45)}
+.bar{height:8px;background:var(--night);border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--glow),var(--leaf));border-radius:999px;transition:width .25s linear}
+.total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;background:var(--night);border-radius:12px;padding:12px 14px}
+.total b{font-family:var(--display);font-size:44px;line-height:1;font-variant-numeric:tabular-nums;color:var(--leaf)}
+.total span{color:var(--mute);font-size:14px}
+.mission{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.mission h3{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--panel-hi);font-size:17px}
+.mission h3 .no{font-family:var(--display);background:var(--leaf);color:#0c2a12;border-radius:8px;padding:1px 8px;font-size:14px}
+.mission h3 .pts{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--leaf)}
+.item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.item .lbl{flex:1;min-width:0}
+.item .lbl small{display:block;color:var(--mute);font-size:13px}
+.step{display:flex;align-items:center;gap:4px;flex:none}
+.step button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--night);font-size:22px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.step output{min-width:34px;text-align:center;font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+.yn{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:none}
+.yn button{border:0;background:var(--night);padding:10px 14px;cursor:pointer;font-weight:700;touch-action:manipulation}
+.yn button[aria-pressed="true"]{background:var(--glow);color:#032019}
+.yn button.no[aria-pressed="true"]{background:var(--panel-hi);color:var(--ink)}
+.item.locked{opacity:.5}
+.pens{display:flex;gap:6px;flex-wrap:wrap}
+.pens button{border:1px solid var(--line);background:var(--night);border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:700}
+.pens button[aria-pressed="true"]{background:var(--coral);color:#2a0905;border-color:var(--coral)}
+.pens button.zero[aria-pressed="true"]{background:var(--panel-hi);color:var(--ink);border-color:var(--line)}
+.gp{display:flex;gap:6px;flex-wrap:wrap}
+.gp button{flex:1;min-width:90px;border:1px solid var(--line);background:var(--night);border-radius:10px;padding:8px;cursor:pointer;font-weight:700}
+.gp button[aria-pressed="true"]{background:var(--sky);color:#04203a;border-color:var(--sky)}
+.zeroed{color:var(--coral);font-weight:700}
+
+/* runs */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:var(--night);border-radius:12px;padding:12px}
+.stat i{font-style:normal;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:700}
+.stat b{display:block;font-family:var(--display);font-size:32px;font-variant-numeric:tabular-nums;color:var(--leaf);line-height:1.1}
+.chart{width:100%;height:auto;display:block}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) 110px 60px;gap:10px;align-items:center;font-size:14px}
+.mrow .track{height:10px;background:var(--night);border-radius:999px;overflow:hidden}
+.mrow .track i{display:block;height:100%;background:var(--glow)}
+.mrow b{text-align:right;font-variant-numeric:tabular-nums}
+.runlist{display:flex;flex-direction:column;gap:8px}
+.run{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--night);border-radius:12px;padding:10px 12px}
+.run .sc{font-family:var(--display);font-size:26px;font-variant-numeric:tabular-nums;color:var(--leaf);min-width:56px;text-align:center}
+.run small{display:block;color:var(--mute);font-size:13px}
+.run .del{background:none;border:0;color:var(--mute);cursor:pointer;font-size:13px;padding:6px}
+.run .del:hover{color:var(--coral)}
+.empty{border:1px dashed var(--line);border-radius:12px;padding:16px;color:var(--mute)}
+
+/* plan */
+.plans{display:flex;flex-direction:column;gap:12px}
+.plan .head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.plan .head input{flex:1;min-width:160px;font-family:var(--display);font-size:18px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--night);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:14px;font-weight:700}
+.chip[aria-pressed="true"]{background:var(--leaf);color:#0c2a12;border-color:var(--leaf)}
+.planmax{font-variant-numeric:tabular-nums;color:var(--leaf);font-weight:700}
+
+/* team */
+.check{display:flex;flex-direction:column;gap:6px}
+.check label{display:flex;gap:10px;align-items:center;background:var(--night);border-radius:10px;padding:9px 12px;cursor:pointer}
+.check label.done span{text-decoration:line-through;color:var(--mute)}
+.check input[type=checkbox]{width:20px;height:20px;accent-color:var(--glow);flex:none}
+.check .x{margin-left:auto;background:none;border:0;color:var(--mute);cursor:pointer}
+.q{font-family:var(--display);font-size:22px;line-height:1.3;background:var(--night);border-radius:12px;padding:16px;min-height:90px}
+.qtabs{display:flex;gap:6px;flex-wrap:wrap}
+
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:rgba(7,33,31,.94);backdrop-filter:blur(8px);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs .wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding-block:6px}
+nav.tabs button{background:none;border:0;border-radius:12px;padding:6px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--mute);font-weight:700;font-size:13px}
+nav.tabs button svg{width:24px;height:24px}
+nav.tabs button[aria-selected="true"]{color:var(--glow);background:var(--panel)}
+
+/* team sheet */
+.sheet{position:fixed;inset:0;z-index:30;background:var(--night);overflow:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet .top{position:sticky;top:0;background:var(--night);border-bottom:1px solid var(--line);z-index:2}
+.sheet .top .wrap{display:flex;align-items:center;height:56px}
+.back{background:none;border:0;color:var(--amber);font-weight:700;cursor:pointer;padding:8px 4px}
+.sheetbody{padding-block:20px 40px;display:flex;flex-direction:column;gap:14px;max-width:720px}
+.codebox{font-family:ui-monospace,Menlo,monospace;font-size:clamp(15px,3.6vw,20px);letter-spacing:.06em;background:var(--panel);border-radius:10px;padding:12px 14px;word-break:break-all}
+.err{color:var(--coral);margin:0;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--leaf);color:#0c2a12;font-weight:700;padding:10px 16px;border-radius:12px;z-index:40;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+footer{color:var(--mute);font-size:12px;padding-block:8px 16px}
+@media (prefers-reduced-motion:reduce){.bar i,.clock{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand"><img src="icons/icon-192.png" alt=""><div><h1>FLL Pit Crew</h1><p>BIOGLOW · 2026–2027 season</p></div></div>
+    <button class="teambtn" id="teamBtn"><i></i><span id="teamLabel">Set up your team</span></button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- MATCH -->
+  <section class="tabpage" id="tab-match">
+    <div class="match">
+      <div class="card timer">
+        <div class="clock" id="clock" role="timer" aria-live="off">2:30</div>
+        <div class="bar"><i id="clockBar" style="width:100%"></i></div>
+        <div class="row">
+          <button class="btn" id="tStart" style="flex:2">Start match</button>
+          <button class="btn quiet" id="tReset" style="flex:1">Reset</button>
+        </div>
+        <div class="total"><div><span>Score</span><br><b id="total">0</b></div><span id="totalNote"></span></div>
+        <label class="field">Which run plan is this?<select id="runPlan"></select></label>
+        <label class="field">Notes about this run<input type="text" id="runNote" maxlength="200" placeholder="Arm slipped on mission 03"></label>
+        <div class="row"><button class="btn" id="saveRun" style="flex:2">Save this run</button><button class="btn quiet" id="clearScore" style="flex:1">Clear score</button></div>
+        <p class="small mute" style="margin:0">Match length: <b id="lenLabel">2:30</b>. <button class="btn quiet small" id="lenBtn">Change</button></p>
+      </div>
+      <div class="tabpage" id="missions"></div>
+    </div>
+  </section>
+
+  <!-- RUNS -->
+  <section class="tabpage" id="tab-runs" hidden>
+    <div class="card"><h2>Practice runs</h2><div class="stats" id="stats"></div></div>
+    <div class="card"><h3>Score over time</h3><div id="chart"></div></div>
+    <div class="card"><h3>Points per mission</h3><p class="small mute" style="margin:0">Average points each mission earns in your last 20 runs, and how often it scores at all.</p><div id="perMission" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    <div class="card"><h3>All runs</h3><div class="runlist" id="runList"></div></div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="tabpage" id="tab-plan" hidden>
+    <div class="card"><h2>Robot runs</h2><p class="mute small" style="margin:0">Plan each trip the robot makes from home: which missions it does, in what order, and which attachment it uses. The points show the most the run could score.</p>
+      <div class="total"><div><span>Most points if every run works</span><br><b id="planTotal">0</b></div></div></div>
+    <div class="plans" id="plans"></div>
+    <button class="btn" id="addPlan">Add a run</button>
+  </section>
+
+  <!-- TEAM -->
+  <section class="tabpage" id="tab-team" hidden>
+    <div class="card"><h2>Innovation Project</h2>
+      <label class="field">The problem we found<textarea id="pjProblem" maxlength="2000" placeholder="What problem connected to BIOGLOW did your team choose?"></textarea></label>
+      <label class="field">Our solution<textarea id="pjSolution" maxlength="2000" placeholder="What did you invent or improve?"></textarea></label>
+      <label class="field">Research and experts we talked to<textarea id="pjResearch" maxlength="2000" placeholder="Books, websites, people you interviewed"></textarea></label>
+      <label class="field">How we will share it<textarea id="pjShare" maxlength="2000" placeholder="Who did you show it to, and what did they say?"></textarea></label>
+      <p class="small mute" id="pjSaved" style="margin:0"></p>
+    </div>
+    <div class="card"><h2>Competition day checklist</h2><div class="check" id="checklist"></div>
+      <form class="row" id="addCheck"><input type="text" id="newCheck" maxlength="120" placeholder="Add something to bring or do" style="flex:1;min-width:180px"><button class="btn small" type="submit">Add</button></form>
+      <div class="row"><button class="btn quiet small" id="untick">Untick everything</button></div></div>
+    <div class="card"><h2>Practice for the judges</h2><p class="mute small" style="margin:0">Pick a topic, then answer the question out loud like you're in the judging room. Take turns!</p>
+      <div class="qtabs" id="qTopics"></div>
+      <div class="q" id="question"></div>
+      <div class="row"><button class="btn" id="nextQ">Next question</button></div></div>
+  </section>
+  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 1</span></footer>
+</main>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap" role="tablist">
+    <button role="tab" data-tab="match" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg>Match</button>
+    <button role="tab" data-tab="runs" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Runs</button>
+    <button role="tab" data-tab="plan" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg>Plan</button>
+    <button role="tab" data-tab="team" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.6c2.8.1 4.8 1.9 5.5 5.4"/></svg>Team</button>
+  </div>
+</nav>
+
+<div class="sheet" id="teamSheet" hidden role="dialog" aria-modal="true" aria-label="Team">
+  <div class="top"><div class="wrap"><button class="back" id="teamBack">‹ Back</button></div></div>
+  <div class="wrap sheetbody" id="teamBody"></div>
+</div>
+<div class="mini" id="mini" hidden><div class="in"><span class="t" id="miniClock">2:30</span><span class="s"><small>Score</small><span id="miniScore">0</span></span><button class="btn small" id="miniBtn">Start</button></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+const now=()=>Date.now();
+const hex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,'0')).join('');
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800)}
+
+/* ---------- the BIOGLOW missions (from the season score sheet) ---------- */
+const MISSIONS=[
+  {id:'m01',no:'01',name:'Güçlü Mikrobiyomlar',items:[
+    {k:'m01a',label:'Genç orman',hint:'Kilit türler, 20 puan each',type:'count',pts:20,max:3},
+    {k:'m01b',label:'Büyük ağaç',hint:'Kilit türler, 20 puan each',type:'count',pts:20,max:3},
+    {k:'m01c',label:'Kovuklu ağaç',hint:'Kilit türler, 20 puan each',type:'count',pts:20,max:3},
+    {k:'m01d',label:'Bonus',hint:'At least 3 kilit türler in genç orman, and the invasive queen on the other field knocked over: 40 puan',type:'yes',pts:40,needs:s=>(s.m01a||0)>=3}]},
+  {id:'m02',no:'02',name:'Yenilenmenin Kökleri',items:[
+    {k:'m02a',label:'Büyük ağacın tabanındaki kaynaklar',hint:'5 puan each',type:'count',pts:5,max:40},
+    {k:'m02b',label:'Kanopi odacığındaki kaynaklar',hint:'10 puan each, up to 15',type:'count',pts:10,max:15}]},
+  {id:'m03',no:'03',name:'Mağara Şelalesi',items:[
+    {k:'m03a',label:'Mağara Şelalesinden geçirilen kilit türler',hint:'5 puan each, up to 50',type:'count',pts:5,max:50}]},
+  {id:'m04',no:'04',name:'Yağmur Ormanının Uyanışı',items:[
+    {k:'m04a',label:'Yuvadaki tüm kilit türler serbest',hint:'30 puan',type:'yes',pts:30},
+    {k:'m04b',label:'Kovuklu ağaçtaki tüm kaynaklar serbest',hint:'20 puan',type:'yes',pts:20}]},
+  {id:'m05',no:'05',name:'Merkez Sığınak',items:[
+    {k:'m05a',label:'Tamamen Merkez Sığınağın içinde',hint:'Kilit türler or kaynaklar, 5 puan each',type:'count',pts:5,max:40}]},
+  {id:'lvl',no:'★',name:'Seviye Atlama: İstilacı Saldırısı',items:[
+    {k:'lv1',label:'Eklenen istilacı türler',hint:'20 puan each, up to 5',type:'count',pts:20,max:5},
+    {k:'lv2',label:'Karantina bölgesindeki istilacı türler',hint:'10 puan each',type:'count',pts:10,max:30}]},
+];
+const ITEMS=MISSIONS.flatMap(m=>m.items.map(i=>Object.assign({m:m.id},i)));
+const PENALTY=[0,-10,-30];
+function itemPts(i,s){const v=+s[i.k]||0;if(i.type==='yes')return v&&(!i.needs||i.needs(s))?i.pts:0;return Math.min(v,i.max)*i.pts}
+function missionPts(m,s){return m.items.reduce((a,i)=>a+itemPts(i,s),0)}
+function scoreOf(s){const pen=+s.pen||0;if(pen>=3)return 0;return Math.max(0,MISSIONS.reduce((a,m)=>a+missionPts(m,s),0)+(PENALTY[pen]||0))}
+// most a mission can score; open-ended counts use a realistic cap so plans stay readable
+const missionMax=m=>m.items.reduce((a,i)=>a+(i.type==='yes'?i.pts:i.max*i.pts),0);
+
+/* ---------- team data: one record, merged item by item ---------- */
+let data=blank();
+function blank(){return{v:1,teamName:'',matchSec:150,runs:{},plans:{},checks:{},project:{u:0},topic:'robot'}}
+try{const s=JSON.parse(localStorage.getItem('fll:data')||'null');if(s&&s.v===1)data=Object.assign(blank(),s)}catch(e){}
+let team=null;try{team=JSON.parse(localStorage.getItem('fll:team')||'null')}catch(e){}
+const saveLocal=()=>{try{localStorage.setItem('fll:data',JSON.stringify(data))}catch(e){}};
+const saveTeam=()=>{try{team?localStorage.setItem('fll:team',JSON.stringify(team)):localStorage.removeItem('fll:team')}catch(e){}};
+// newest change wins, per run, per plan, per checklist line
+function merge(a,b){
+  a=Object.assign(blank(),obj(a));b=Object.assign(blank(),obj(b));
+  const out=blank();
+  for(const k of ['runs','plans','checks']){out[k]={};const A=obj(a[k]),B=obj(b[k]);
+    for(const id of new Set([...Object.keys(A),...Object.keys(B)])){const x=obj(A[id]),y=obj(B[id]);out[k][id]=(+y.u||0)>(+x.u||0)?y:x}}
+  out.project=(+obj(b.project).u||0)>(+obj(a.project).u||0)?obj(b.project):obj(a.project);
+  out.teamName=String(b.teamName||a.teamName||'').slice(0,40);
+  out.matchSec=(+b.setU||0)>(+a.setU||0)?b.matchSec:a.matchSec;out.setU=Math.max(+a.setU||0,+b.setU||0);
+  out.topic=a.topic;out.updatedAt=Math.max(+a.updatedAt||0,+b.updatedAt||0);
+  return out;
+}
+const live=m=>Object.entries(obj(m)).filter(([,x])=>x&&!x.deleted);
+
+/* ---------- sharing (free storage, ~50 requests a day per device) ---------- */
+const API='https://api.restful-api.dev/objects/',KIND='fll-pitcrew';
+class SyncError extends Error{}
+const ERR={offline:'You seem to be offline. Changes are saved on this device and will sync later.',limit:'The free storage has reached today\'s limit on this device. Changes are kept here and will sync tomorrow.',
+  missing:'No team was found with that code. Check the code and try again.',server:'The storage didn\'t answer. Changes are kept on this device; try again in a minute.'};
+const errText=e=>ERR[e&&e.message]||ERR.server;
+async function api(method,id,body){
+  let r;try{r=await fetch(API+(id||''),{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(e){throw new SyncError('offline')}
+  if(r.status===404||r.status===400)throw new SyncError('missing');if(r.status===429)throw new SyncError('limit');if(!r.ok)throw new SyncError('server');
+  return r.json();
+}
+const fmtCode=id=>String(id).toUpperCase().match(/.{1,4}/g).join('-');
+const parseCode=s=>{const m=String(s||'').replace(/^.*#team=/,'').replace(/[^0-9a-f]/gi,'').toLowerCase();return /^[0-9a-f]{16,64}$/.test(m)?m:null};
+let syncState='',lastSync=0,dirty=false,syncTimer=null,syncing=false;
+async function readTeam(id){const o=await api('GET',id);if(!o||o.name!==KIND||obj(o.data).v!==1)throw new SyncError('missing');return o.data}
+async function sync(){
+  if(!team||syncing)return;syncing=true;setTeamBtn('Syncing…');
+  try{
+    const remote=await readTeam(team.id);
+    const merged=merge(remote,data);
+    const changed=JSON.stringify(merged.runs)!==JSON.stringify(obj(remote.runs))||JSON.stringify(merged.plans)!==JSON.stringify(obj(remote.plans))||JSON.stringify(merged.checks)!==JSON.stringify(obj(remote.checks))||JSON.stringify(merged.project)!==JSON.stringify(obj(remote.project))||merged.matchSec!==remote.matchSec;
+    if(changed){merged.updatedAt=now();await api('PUT',team.id,{name:KIND,data:merged})}
+    data=merged;saveLocal();dirty=false;lastSync=now();syncState='';
+  }catch(e){syncState=errText(e)}
+  syncing=false;setTeamBtn();renderAll();
+}
+// wait a few seconds after changes so several taps share one sync
+function changed(){data.updatedAt=now();saveLocal();if(!team)return;dirty=true;setTeamBtn();clearTimeout(syncTimer);syncTimer=setTimeout(sync,6000)}
+function setTeamBtn(busy){
+  const b=$('teamBtn');b.classList.toggle('on',!!team);
+  $('teamLabel').textContent=team?(busy||(syncState?'Not synced':dirty?'Saving soon…':(data.teamName||'Team')+' · synced')):'Set up your team';
+}
+
+/* ---------- match: timer ---------- */
+let tLeft=data.matchSec,tRun=false,tEnd=0,tick=null,countdown=0,wake=null;
+let AC=null;
+function beep(f,d=.15,vol=.08,type='square'){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02)}catch(e){}}
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+function drawClock(){
+  const s=Math.max(0,Math.ceil(tLeft));
+  $('clock').textContent=countdown?String(countdown):fmt(s);
+  $('clock').className='clock'+(countdown?' soon':s===0?' end':s<=30?' soon':'');
+  $('clockBar').style.width=(100*Math.max(0,tLeft)/data.matchSec)+'%';
+  $('tStart').textContent=countdown?'Get ready…':tRun?'Pause':tLeft<data.matchSec&&tLeft>0?'Resume':tLeft<=0?'Match over':'Start match';
+  $('tStart').disabled=tLeft<=0||!!countdown;
+  $('lenLabel').textContent=fmt(data.matchSec);
+  $('miniClock').textContent=$('clock').textContent;$('miniClock').className='t'+($('clock').className.includes('end')?' end':$('clock').className.includes('soon')?' soon':'');
+  $('miniBtn').textContent=countdown?'…':tRun?'Pause':tLeft<=0?'Over':tLeft<data.matchSec?'Resume':'Start';$('miniBtn').disabled=$('tStart').disabled;
+}
+let lastWhole=null;
+function step(){
+  tLeft=(tEnd-performance.now())/1000;
+  const w=Math.ceil(tLeft);
+  if(w!==lastWhole){lastWhole=w;if(w===30)beep(660,.25);if(w<=10&&w>0)beep(880,.08,.06);}
+  if(tLeft<=0){tLeft=0;tRun=false;clearInterval(tick);beep(220,.9,.12,'sawtooth');releaseWake();toast('Match over! Score it and save the run.')}
+  drawClock();
+}
+async function holdWake(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){wake=null}}
+function releaseWake(){try{wake&&wake.release()}catch(e){}wake=null}
+$('tStart').onclick=()=>{
+  if(tRun){tRun=false;clearInterval(tick);tLeft=(tEnd-performance.now())/1000;releaseWake();drawClock();return}
+  const go=()=>{tRun=true;tEnd=performance.now()+tLeft*1000;lastWhole=null;tick=setInterval(step,100);beep(1046,.4,.1);holdWake();drawClock()};
+  if(tLeft>=data.matchSec){countdown=3;drawClock();beep(523,.15);
+    const c=setInterval(()=>{countdown--;if(countdown>0){beep(523,.15);drawClock()}else{clearInterval(c);countdown=0;go()}},1000);}
+  else go();
+};
+$('tReset').onclick=()=>{tRun=false;clearInterval(tick);countdown=0;tLeft=data.matchSec;releaseWake();drawClock()};
+$('lenBtn').onclick=()=>{
+  const opts=[120,150,180];const i=opts.indexOf(data.matchSec);data.matchSec=opts[(i+1)%opts.length];data.setU=now();
+  if(!tRun){tLeft=data.matchSec}changed();drawClock();toast('Match length: '+fmt(data.matchSec));
+};
+
+/* ---------- match: scorer ---------- */
+let sheet={};try{sheet=JSON.parse(localStorage.getItem('fll:sheet')||'{}')||{}}catch(e){}
+const saveSheet=()=>{try{localStorage.setItem('fll:sheet',JSON.stringify(sheet))}catch(e){}};
+function renderMissions(){
+  const box=$('missions');box.innerHTML='';
+  for(const m of MISSIONS){
+    const el=document.createElement('div');el.className='mission';
+    el.innerHTML=`<h3><span class="no">${m.no}</span>${esc(m.name)}<span class="pts" data-mp="${m.id}">0</span></h3>`+m.items.map(i=>`<div class="item" data-k="${i.k}">
+      <div class="lbl">${esc(i.label)}<small>${esc(i.hint)}</small></div>
+      ${i.type==='count'?`<div class="step"><button data-d="-1" aria-label="One less">−</button><output>0</output><button data-d="1" aria-label="One more">+</button></div>`
+        :`<div class="yn"><button class="no" data-v="0">No</button><button data-v="1">Yes</button></div>`}</div>`).join('');
+    box.appendChild(el);
+  }
+  const pen=document.createElement('div');pen.className='mission';
+  pen.innerHTML=`<h3><span class="no" style="background:var(--coral);color:#2a0905">!</span>Cezalar (penalties)</h3><div class="item"><div class="pens" id="pens">${['0','1 (−10)','2 (−30)','3+ (score 0)'].map((t,i)=>`<button data-p="${i}" class="${i?'':'zero'}">${t}</button>`).join('')}</div></div>`;
+  box.appendChild(pen);
+  const gp=document.createElement('div');gp.className='mission';
+  gp.innerHTML=`<h3><span class="no" style="background:var(--sky);color:#04203a">GP</span>Duyarlı Profesyonellik</h3><div class="item"><div class="lbl"><small>How the referee might rate your team's Gracious Professionalism at the table. It doesn't change the score.</small></div></div><div class="item"><div class="gp" id="gp">${[['2','Gelişiyor'],['3','Ustaca'],['4','Örnek olacak']].map(([v,t])=>`<button data-g="${v}">${v} · ${t}</button>`).join('')}</div></div>`;
+  box.appendChild(gp);
+  box.onclick=e=>{
+    const it=e.target.closest('.item[data-k]');
+    if(it&&e.target.dataset.d){const i=ITEMS.find(x=>x.k===it.dataset.k);sheet[i.k]=Math.max(0,Math.min(i.max,(+sheet[i.k]||0)+(+e.target.dataset.d)));tapped()}
+    else if(it&&e.target.dataset.v!==undefined){const i=ITEMS.find(x=>x.k===it.dataset.k);if(i.needs&&!i.needs(sheet)&&e.target.dataset.v==='1'){toast('Needs at least 3 kilit türler in genç orman first');return}sheet[i.k]=+e.target.dataset.v;tapped()}
+    else if(e.target.dataset.p!==undefined){sheet.pen=+e.target.dataset.p;tapped()}
+    else if(e.target.dataset.g){sheet.gp=sheet.gp===e.target.dataset.g?null:e.target.dataset.g;tapped()}
+  };
+  paintSheet();
+}
+function tapped(){try{navigator.vibrate&&navigator.vibrate(8)}catch(e){}saveSheet();paintSheet()}
+function paintSheet(){
+  for(const i of ITEMS){const el=document.querySelector(`.item[data-k="${i.k}"]`);if(!el)continue;
+    const v=+sheet[i.k]||0;
+    if(i.type==='count'){el.querySelector('output').textContent=v;el.querySelector('[data-d="-1"]').disabled=v<=0;el.querySelector('[data-d="1"]').disabled=v>=i.max}
+    else{const ok=!i.needs||i.needs(sheet);if(!ok&&v){sheet[i.k]=0}el.classList.toggle('locked',!ok);el.querySelectorAll('[data-v]').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===(+sheet[i.k]||0))))}}
+  for(const m of MISSIONS)document.querySelector(`[data-mp="${m.id}"]`).textContent=missionPts(m,sheet);
+  document.querySelectorAll('#pens button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.p===(+sheet.pen||0))));
+  document.querySelectorAll('#gp button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.g===sheet.gp)));
+  const tot=scoreOf(sheet);$('total').textContent=tot;$('miniScore').textContent=tot;
+  $('totalNote').innerHTML=(+sheet.pen||0)>=3?'<span class="zeroed">3+ penalties: score is 0</span>':(+sheet.pen?`includes ${PENALTY[+sheet.pen]} for penalties`:'');
+}
+$('clearScore').onclick=()=>{let armed=$('clearScore').dataset.armed;if(!armed){$('clearScore').dataset.armed='1';$('clearScore').textContent='Tap again';setTimeout(()=>{delete $('clearScore').dataset.armed;$('clearScore').textContent='Clear score'},2500);return}
+  delete $('clearScore').dataset.armed;$('clearScore').textContent='Clear score';sheet={};saveSheet();paintSheet()};
+$('saveRun').onclick=()=>{
+  const id='r'+now().toString(36)+hex(2);
+  data.runs[id]={t:now(),u:now(),score:scoreOf(sheet),parts:Object.fromEntries(ITEMS.map(i=>[i.k,+sheet[i.k]||0]).filter(([,v])=>v)),pen:+sheet.pen||0,gp:sheet.gp||null,
+    left:Math.round(Math.max(0,tLeft)),plan:$('runPlan').value||null,note:$('runNote').value.trim().slice(0,200),by:team?team.nick:''};
+  changed();toast('Run saved: '+data.runs[id].score+' points');
+  sheet={};saveSheet();paintSheet();$('runNote').value='';$('tReset').click();renderRuns();
+};
+function renderPlanSelect(){
+  const sel=$('runPlan'),cur=sel.value;
+  const plans=live(data.plans).sort((a,b)=>(a[1].order||0)-(b[1].order||0));
+  sel.innerHTML='<option value="">Full match (all runs)</option>'+plans.map(([id,p])=>`<option value="${esc(id)}">${esc(p.name||'Run')}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+}
+
+// slim timer bar when the big one scrolls out of view (phones)
+let timerVisible=true;
+new IntersectionObserver(es=>{timerVisible=es[0].isIntersecting;showMini()},{threshold:0}).observe(document.querySelector('.timer'));
+function showMini(){$('mini').hidden=timerVisible||$('tab-match').hidden||getComputedStyle(document.querySelector('.timer')).position==='sticky'}
+$('miniBtn').onclick=()=>$('tStart').click();
+
+/* ---------- runs ---------- */
+function renderRuns(){
+  const runs=live(data.runs).map(([id,r])=>Object.assign({id},r)).filter(r=>Number.isFinite(+r.score)).sort((a,b)=>b.t-a.t);
+  const scores=runs.map(r=>+r.score);
+  const last10=scores.slice(0,10);
+  const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):0;
+  const today=runs.filter(r=>new Date(r.t).toDateString()===new Date().toDateString()).length;
+  $('stats').innerHTML=[['Best score',scores.length?Math.max(...scores):'–'],['Average, last 10',scores.length?avg(last10):'–'],['Runs saved',runs.length],['Runs today',today]]
+    .map(([k,v])=>`<div class="stat"><i>${k}</i><b>${v}</b></div>`).join('');
+  // chart, oldest to newest, last 30
+  const pts=runs.slice(0,30).reverse();
+  if(pts.length<2){$('chart').innerHTML='<div class="empty">Save at least two runs to see your progress.</div>'}
+  else{
+    const W=640,H=200,P={l:36,r:12,t:12,b:24},max=Math.max(50,Math.ceil(Math.max(...pts.map(r=>+r.score))/50)*50);
+    const x=i=>P.l+i*(W-P.l-P.r)/(pts.length-1),y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+    let g='';for(let v=0;v<=max;v+=max/4){g+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="#1f5a4f"/><text x="${P.l-6}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="#93c1b3">${Math.round(v)}</text>`}
+    const line=pts.map((r,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(+r.score).toFixed(1)}`).join('');
+    const area=line+`L${x(pts.length-1)},${y(0)}L${x(0)},${y(0)}Z`;
+    $('chart').innerHTML=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scores of your last ${pts.length} runs">${g}<path d="${area}" fill="rgba(92,242,180,.14)"/><path d="${line}" fill="none" stroke="#5cf2b4" stroke-width="3" stroke-linejoin="round"/>${pts.map((r,i)=>`<circle cx="${x(i)}" cy="${y(+r.score)}" r="${i===pts.length-1?5:3}" fill="${i===pts.length-1?'#ffc857':'#5cf2b4'}"/>`).join('')}<text x="${P.l}" y="${H-6}" font-size="11" fill="#93c1b3">older</text><text x="${W-P.r}" y="${H-6}" font-size="11" fill="#93c1b3" text-anchor="end">newest</text></svg>`;
+  }
+  // per mission
+  const recent=runs.slice(0,20);
+  $('perMission').innerHTML=recent.length?MISSIONS.map(m=>{
+    const got=recent.map(r=>missionPts(m,Object.assign({},r.parts)));const a=got.reduce((x,y)=>x+y,0)/recent.length;const hit=got.filter(v=>v>0).length;const mx=missionMax(m);
+    return `<div class="mrow"><span>${m.no} ${esc(m.name)}</span><div class="track"><i style="width:${Math.min(100,100*a/mx)}%"></i></div><b>${Math.round(a)} · ${Math.round(100*hit/recent.length)}%</b></div>`}).join(''):'<div class="empty">No runs yet.</div>';
+  // list
+  const planName=id=>{const p=obj(data.plans[id]);return p.name&&!p.deleted?p.name:'Full match'};
+  $('runList').innerHTML=runs.length?runs.slice(0,60).map(r=>`<div class="run"><span class="sc">${+r.score}</span><div>${esc(planName(r.plan))}${r.note?' · '+esc(r.note):''}<small>${new Date(r.t).toLocaleString([], {weekday:'short',hour:'2-digit',minute:'2-digit'})}${r.by?' · '+esc(r.by):''}${r.left?' · '+fmt(r.left)+' left':''}${r.pen?' · '+r.pen+' penalt'+(r.pen>1?'ies':'y'):''}</small></div><button class="del" data-id="${esc(r.id)}">Delete</button></div>`).join('')
+    :'<div class="empty">No runs yet. Score a match on the Match tab, then tap "Save this run".</div>';
+  $('runList').onclick=e=>{const id=e.target.dataset.id;if(!id)return;if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Sure?';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Delete'}},2500);return}
+    data.runs[id]={deleted:true,u:now()};changed();renderRuns()};
+}
+
+/* ---------- plan ---------- */
+function renderPlans(){
+  const plans=live(data.plans).sort((a,b)=>(a[1].order||0)-(b[1].order||0));
+  const box=$('plans');
+  if(!plans.length){box.innerHTML='<div class="empty">No runs planned yet. Tap "Add a run" to plan your robot\'s first trip.</div>';$('planTotal').textContent=0;renderPlanSelect();return}
+  const used=new Set();plans.forEach(([,p])=>(p.missions||[]).forEach(m=>used.add(m)));
+  $('planTotal').textContent=MISSIONS.filter(m=>used.has(m.id)).reduce((a,m)=>a+missionMax(m),0);
+  box.innerHTML=plans.map(([id,p],i)=>`<div class="card plan" data-id="${esc(id)}">
+    <div class="head"><span class="no" style="font-family:var(--display);background:var(--amber);color:#2a1d00;border-radius:8px;padding:2px 10px">${i+1}</span>
+      <input type="text" data-f="name" maxlength="40" value="${esc(p.name||'')}" aria-label="Run name" placeholder="Run ${i+1}">
+      <button class="btn quiet small" data-a="up" ${i?'':'disabled'} aria-label="Move up">↑</button><button class="btn quiet small" data-a="down" ${i<plans.length-1?'':'disabled'} aria-label="Move down">↓</button></div>
+    <div class="chips">${MISSIONS.map(m=>`<button class="chip" data-m="${m.id}" aria-pressed="${(p.missions||[]).includes(m.id)}">${m.no} ${esc(m.name)}</button>`).join('')}</div>
+    <div class="row"><label class="field" style="flex:1;min-width:180px">Attachment<input type="text" data-f="attach" maxlength="60" value="${esc(p.attach||'')}" placeholder="Front scoop"></label>
+      <label class="field" style="flex:1;min-width:180px">Starts from<input type="text" data-f="start" maxlength="40" value="${esc(p.start||'')}" placeholder="Left home, 3 squares in"></label></div>
+    <label class="field">Notes<input type="text" data-f="note" maxlength="200" value="${esc(p.note||'')}" placeholder="Drive slowly before the waterfall"></label>
+    <div class="row"><span class="small mute">Up to <span class="planmax">${MISSIONS.filter(m=>(p.missions||[]).includes(m.id)).reduce((a,m)=>a+missionMax(m),0)}</span> points</span><span style="flex:1"></span><button class="btn quiet small" data-a="del">Delete run</button></div></div>`).join('');
+  renderPlanSelect();
+}
+$('plans').addEventListener('click',e=>{
+  const card=e.target.closest('.plan');if(!card)return;const id=card.dataset.id,p=data.plans[id];
+  if(e.target.dataset.m){const set=new Set(p.missions||[]);set.has(e.target.dataset.m)?set.delete(e.target.dataset.m):set.add(e.target.dataset.m);p.missions=MISSIONS.map(m=>m.id).filter(x=>set.has(x));p.u=now();changed();renderPlans()}
+  const a=e.target.dataset.a;
+  if(a==='del'){if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Tap again to delete';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Delete run'}},2500);return}
+    data.plans[id]={deleted:true,u:now()};changed();renderPlans()}
+  if(a==='up'||a==='down'){const list=live(data.plans).sort((x,y)=>(x[1].order||0)-(y[1].order||0)).map(x=>x[0]);const i=list.indexOf(id),j=a==='up'?i-1:i+1;
+    if(j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]];list.forEach((pid,k)=>{data.plans[pid].order=k;data.plans[pid].u=now()});changed();renderPlans()}
+});
+$('plans').addEventListener('input',e=>{const f=e.target.dataset.f;if(!f)return;const id=e.target.closest('.plan').dataset.id;data.plans[id][f]=e.target.value;data.plans[id].u=now();changed();if(f==='name')renderPlanSelect()});
+$('addPlan').onclick=()=>{const n=live(data.plans).length;const id='p'+now().toString(36)+hex(2);data.plans[id]={name:'Run '+(n+1),missions:[],order:n,u:now()};changed();renderPlans();
+  setTimeout(()=>document.querySelector(`.plan[data-id="${id}"] input`)?.focus(),50)};
+
+/* ---------- team helper ---------- */
+const PJ=[['pjProblem','problem'],['pjSolution','solution'],['pjResearch','research'],['pjShare','share']];
+let pjT=null;
+PJ.forEach(([el,f])=>$(el).addEventListener('input',()=>{clearTimeout(pjT);$('pjSaved').textContent='';pjT=setTimeout(()=>{
+  data.project=Object.assign({},data.project,Object.fromEntries(PJ.map(([e,k])=>[k,$(e).value.slice(0,2000)])),{u:now()});changed();$('pjSaved').textContent=team?'Saved, and shared with your team':'Saved on this device'},700)}));
+function renderProject(){for(const [el,f] of PJ)if(document.activeElement!==$(el))$(el).value=String(obj(data.project)[f]||'')}
+const DEFAULT_CHECKS=['Robot fully charged, plus a spare battery','All attachments in the team box','Programs downloaded and named Run 1, Run 2…','Engineering notebook','Innovation Project poster or model','Team T-shirts','Water and snacks','Spare LEGO parts and a brick separator','Practice the robot game one last time','Arrive early and find our pit table'];
+function seedChecks(){if(Object.keys(data.checks).length)return;DEFAULT_CHECKS.forEach((t,i)=>data.checks['c'+i]={text:t,done:false,order:i,u:1})}
+function renderChecks(){
+  const list=live(data.checks).sort((a,b)=>(a[1].order||0)-(b[1].order||0));
+  $('checklist').innerHTML=list.length?list.map(([id,c])=>`<label class="${c.done?'done':''}"><input type="checkbox" data-id="${esc(id)}" ${c.done?'checked':''}><span>${esc(c.text)}</span><button type="button" class="x" data-x="${esc(id)}" aria-label="Remove">✕</button></label>`).join(''):'<div class="empty">Nothing on the list.</div>';
+}
+$('checklist').addEventListener('change',e=>{const id=e.target.dataset.id;if(!id)return;data.checks[id].done=e.target.checked;data.checks[id].u=now();changed();renderChecks()});
+$('checklist').addEventListener('click',e=>{const id=e.target.dataset.x;if(!id)return;e.preventDefault();data.checks[id]={deleted:true,u:now()};changed();renderChecks()});
+$('addCheck').onsubmit=e=>{e.preventDefault();const t=$('newCheck').value.trim();if(!t)return;const n=live(data.checks).length;data.checks['c'+now().toString(36)+hex(2)]={text:t.slice(0,120),done:false,order:n+100,u:now()};$('newCheck').value='';changed();renderChecks()};
+$('untick').onclick=()=>{live(data.checks).forEach(([id])=>{data.checks[id].done=false;data.checks[id].u=now()});changed();renderChecks()};
+const QUESTIONS={
+  robot:['Walk us through your robot. Why did you choose this drive base?','Which attachment are you proudest of, and how many versions did it take?','How does your robot drive straight and turn accurately?','Which sensor helps you most, and how do you use it in your code?','Tell us about a mission that kept failing. How did you fix it?','How did you decide the order of your robot runs?','How does your team test changes to the code?','If you had two more weeks, what would you improve on the robot?','Who on the team does the programming, and how do you share that work?','Show us one part of your code and explain what it does.'],
+  project:['What problem did you choose, and why does it matter?','How is your problem connected to this season\'s BIOGLOW theme?','Which experts did you talk to, and what did you learn from them?','How did your solution change after you got feedback?','How would you know if your solution actually works?','Who would use your solution, and how would it help them?','What would it cost to make your solution real?','What was the hardest part of the project?','How did you share your project with people outside your team?','What other solutions did you think about before choosing this one?'],
+  values:['Tell us about a time your team disagreed. How did you decide?','How did you help another team this season?','What has each person on the team learned?','How do you make sure everyone gets a turn to speak and to build?','What does Gracious Professionalism mean to your team?','What was the most fun moment of the season?','How do you divide the jobs on your team?','What would you tell a new team that is just starting FLL?','How did your team stay positive after a bad practice run?','What surprised you most about working as a team?'],
+};
+const TOPICS=[['robot','Robot design'],['project','Innovation Project'],['values','Core Values']];
+let qOrder={};
+function nextQuestion(){const t=data.topic||'robot',qs=QUESTIONS[t];if(!qOrder[t]||!qOrder[t].length)qOrder[t]=qs.map((_,i)=>i).sort(()=>Math.random()-.5);$('question').textContent=qs[qOrder[t].pop()]}
+function renderTopics(){$('qTopics').innerHTML=TOPICS.map(([k,l])=>`<button class="chip" data-t="${k}" aria-pressed="${(data.topic||'robot')===k}">${l}</button>`).join('')}
+$('qTopics').onclick=e=>{const t=e.target.dataset.t;if(!t)return;data.topic=t;saveLocal();renderTopics();nextQuestion()};
+$('nextQ').onclick=nextQuestion;
+
+/* ---------- team code ---------- */
+function renderTeamSheet(){
+  const b=$('teamBody');
+  if(!team){
+    const nick=String(localStorage.getItem('fll:nick')||'');
+    b.innerHTML=`<div><h2>Share with your team</h2><p class="mute">Start a team and share its code. Everyone who joins sees the same practice runs, run plans, project notes and checklist. Everyone on the team can change them.</p></div>
+      <div class="card"><h3>Join your team</h3>
+        <label class="field">Team code<input type="text" id="jCode" autocomplete="off" autocapitalize="characters" placeholder="Paste the code or invite link" value="${esc(prefill)}"></label>
+        <label class="field">Your name or nickname<input type="text" id="jNick" maxlength="20" value="${esc(nick)}"></label>
+        <button class="btn" id="jGo">Join the team</button></div>
+      <div class="card"><h3>Start a new team</h3>
+        <label class="field">Team name<input type="text" id="cName" maxlength="40" placeholder="Our FLL team"></label>
+        <label class="field">Your name or nickname<input type="text" id="cNick" maxlength="20" value="${esc(nick)}"></label>
+        <p class="small mute" style="margin:0">Everything already on this device goes into the new team.</p>
+        <button class="btn" id="cGo">Start the team</button></div>
+      <p class="err" id="tErr" hidden></p>
+      <p class="small mute">Team data is kept on a free online storage service. Anyone with the code can see and change it, so only share it with your team, and don't write private things.</p>`;
+    const fail=m=>{$('tErr').hidden=false;$('tErr').textContent=m};
+    $('jGo').onclick=async()=>{const code=parseCode($('jCode').value),nick=$('jNick').value.trim().slice(0,20);
+      if(!code)return fail('Paste the team code or invite link first. It looks like FF80-8181-…');if(!nick)return fail('Type your name or nickname.');
+      try{localStorage.setItem('fll:nick',nick)}catch(e){}
+      $('jGo').disabled=true;$('jGo').textContent='Joining…';
+      try{const remote=await readTeam(code);data=merge(remote,data);team={id:code,nick};saveTeam();saveLocal();prefill='';await sync();renderTeamSheet();toast('You joined '+(data.teamName||'the team'))}
+      catch(e){fail(e.message==='missing'?ERR.missing:errText(e));$('jGo').disabled=false;$('jGo').textContent='Join the team'}};
+    $('cGo').onclick=async()=>{const name=$('cName').value.trim().slice(0,40)||'Our FLL team',nick=$('cNick').value.trim().slice(0,20);
+      if(!nick)return fail('Type your name or nickname.');try{localStorage.setItem('fll:nick',nick)}catch(e){}
+      $('cGo').disabled=true;$('cGo').textContent='Starting…';
+      try{data.teamName=name;data.updatedAt=now();const o=await api('POST',null,{name:KIND,data});if(!o||!o.id)throw new SyncError('server');
+        team={id:o.id,nick};saveTeam();saveLocal();lastSync=now();syncState='';dirty=false;setTeamBtn();renderTeamSheet();toast('Team started!')}
+      catch(e){fail(errText(e));$('cGo').disabled=false;$('cGo').textContent='Start the team'}};
+    return;
+  }
+  b.innerHTML=`<div><h2>${esc(data.teamName||'Your team')}</h2><p class="mute">You're on the team as <b>${esc(team.nick)}</b>. ${syncState?esc(syncState):lastSync?'Synced '+ago(lastSync)+'.':''}</p></div>
+    <div class="card"><h3>Invite your teammates</h3><div class="codebox">${esc(fmtCode(team.id))}</div>
+      <div class="row"><button class="btn small" id="cpLink">Copy invite link</button><button class="btn quiet small" id="cpCode">Copy code</button></div>
+      <p class="small mute" style="margin:0">Teammates open the link, type their name, and they're in. The code never changes, and this device remembers it.</p></div>
+    <div class="row"><button class="btn quiet" id="syncNow">Sync now</button><button class="btn quiet" id="leave">Leave this team on this device</button></div>
+    <p class="small mute">The app syncs when you open it and a few seconds after you change something. Leaving keeps a copy of everything on this device.</p>`;
+  $('cpLink').onclick=e=>copy(location.origin+location.pathname+'#team='+team.id,e.target);$('cpCode').onclick=e=>copy(fmtCode(team.id),e.target);
+  $('syncNow').onclick=()=>sync().then(renderTeamSheet);
+  $('leave').onclick=e=>{if(!e.target.dataset.armed){e.target.dataset.armed='1';e.target.textContent='Tap again to leave';setTimeout(()=>{if(e.target.isConnected){delete e.target.dataset.armed;e.target.textContent='Leave this team on this device'}},3000);return}
+    team=null;saveTeam();setTeamBtn();renderTeamSheet()};
+}
+function ago(t){const s=(now()-t)/1000;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+' min ago';return Math.floor(s/3600)+' h ago'}
+function copy(text,btn){const done=()=>{const o=btn.textContent;btn.textContent='Copied';setTimeout(()=>btn.textContent=o,1300)};try{navigator.clipboard.writeText(text).then(done,()=>prompt('Copy this:',text))}catch(e){prompt('Copy this:',text)}}
+let prefill='';
+function openTeam(){renderTeamSheet();$('teamSheet').hidden=false;document.body.style.overflow='hidden';$('teamBack').focus()}
+function closeTeam(){$('teamSheet').hidden=true;document.body.style.overflow=''}
+$('teamBtn').onclick=openTeam;$('teamBack').onclick=closeTeam;
+function checkInvite(){const c=location.hash.startsWith('#team=')?parseCode(location.hash):null;if(!c)return;history.replaceState(null,'',location.pathname);
+  if(team&&team.id===c){openTeam();return}if(team){toast('Leave your current team first to join another one');openTeam();return}prefill=fmtCode(c);openTeam()}
+addEventListener('hashchange',checkInvite);
+
+/* ---------- tabs ---------- */
+function showTab(t){document.querySelectorAll('.tabpage[id^="tab-"]').forEach(s=>s.hidden=s.id!=='tab-'+t);document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  try{localStorage.setItem('fll:tab',t)}catch(e){}scrollTo(0,0);if(t==='runs')renderRuns();showMini()}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('teamSheet').hidden)closeTeam()});
+
+/* ---------- start ---------- */
+function renderAll(){if(!tRun&&!countdown&&tLeft>data.matchSec)tLeft=data.matchSec;drawClock();renderPlans();renderRuns();renderProject();renderChecks();renderTopics();if(!$('teamSheet').hidden)renderTeamSheet()}
+seedChecks();renderMissions();renderAll();nextQuestion();setTeamBtn();
+try{const t=localStorage.getItem('fll:tab');if(t&&$('tab-'+t))showTab(t)}catch(e){}
+checkInvite();
+if(team)sync();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(team&&now()-lastSync>120000)sync()}else if(dirty){clearTimeout(syncTimer);sync()}});
+if('serviceWorker' in navigator){
+  let reloaded=false;const had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!tRun){reloaded=true;location.reload()}});
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
+}
+})();
+</script>
+</body>
+</html>
