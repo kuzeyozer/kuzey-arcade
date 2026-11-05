@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kuzey Arcade">
+<title>Word Detective</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Chakra+Petch:wght@400;600;700&display=swap">
+<style>
+/* Layout: a detective's case board. Mode and language on top, the 6x5 clue grid in the middle, the keyboard at the bottom. Dark only, like the rest of the arcade. */
+:root{--night:#0b0820;--panel:#151036;--tile:#1d1748;--line:#2c2468;--ink:#ecebff;--mute:#9a94c9;
+  --hit:#2fbf71;--near:#e8b330;--miss:#3a3552;--cyan:#3ef0ff;
+  --display:'Orbitron',ui-monospace,monospace;--body:'Chakra Petch',system-ui,sans-serif;color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--night);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding-block:10px 8px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+header{width:min(520px,100%);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:900;font-size:20px;margin:0 auto 0 0;letter-spacing:.04em;background:linear-gradient(90deg,var(--cyan),var(--near));-webkit-background-clip:text;background-clip:text;color:transparent}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--panel);border:0;padding:6px 10px;cursor:pointer;font-weight:700;font-size:13px;color:var(--mute)}
+.seg button[aria-pressed="true"]{background:var(--cyan);color:var(--night)}
+a.back{color:var(--mute);text-decoration:none;font-family:var(--display);font-size:11px;letter-spacing:.1em}
+.status{width:min(520px,100%);display:flex;justify-content:space-between;color:var(--mute);font-size:13px;font-weight:700}
+.grid{display:grid;grid-template-rows:repeat(6,1fr);gap:6px;width:min(330px,82vw,46vh);flex:none}
+.row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.row.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.t{aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--line);border-radius:8px;font-family:var(--display);font-weight:900;font-size:clamp(20px,6vw,30px);background:var(--tile);text-transform:none}
+.t.full{border-color:var(--mute)}
+.t.hit{background:var(--hit);border-color:var(--hit);color:#05200f}
+.t.near{background:var(--near);border-color:var(--near);color:#2a1d00}
+.t.miss{background:var(--miss);border-color:var(--miss);color:var(--mute)}
+.t.pop{animation:pop .3s}
+@keyframes pop{50%{transform:scale(1.08)}}
+.msg{min-height:24px;font-weight:700;text-align:center}
+.kb{width:min(560px,100%);display:flex;flex-direction:column;gap:6px;margin-top:auto}
+.kr{display:flex;gap:4px;justify-content:center}
+.k{flex:1;max-width:46px;height:52px;border:0;border-radius:7px;background:var(--line);font-weight:700;font-size:16px;cursor:pointer;touch-action:manipulation;padding:0}
+.k.wide{max-width:72px;flex:1.6;font-size:12px}
+.k.hit{background:var(--hit);color:#05200f}.k.near{background:var(--near);color:#2a1d00}.k.miss{background:#211d36;color:#5c5778}
+.end{width:min(520px,100%);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center}
+.end b{font-family:var(--display);font-size:22px;letter-spacing:.08em}
+.end .btn{border:0;border-radius:8px;padding:10px 18px;font-family:var(--display);font-weight:900;font-size:14px;cursor:pointer;background:var(--cyan);color:var(--night)}
+.help{font-size:12px;color:var(--mute);display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.help i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+@media (prefers-reduced-motion:reduce){.row.shake,.t.pop{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>WORD DETECTIVE</h1>
+  <div class="seg" role="group" aria-label="Language"><button data-lang="tr" aria-pressed="true">TR</button><button data-lang="en" aria-pressed="false">EN</button></div>
+  <div class="seg" role="group" aria-label="Mode"><button data-mode="daily" aria-pressed="true" id="mDaily">Daily</button><button data-mode="practice" aria-pressed="false" id="mPractice">Practice</button></div>
+  <a class="back" href="./">ARCADE</a>
+</header>
+<div class="status"><span id="caseNo"></span><span id="streak"></span></div>
+<div class="grid" id="grid"></div>
+<div class="msg" id="msg" role="status"></div>
+<div class="end" id="end" hidden><b id="endTitle"></b><span id="endText"></span><button class="btn" id="endBtn"></button></div>
+<div class="help"><span><i style="background:var(--hit)"></i><span id="hHit"></span></span><span><i style="background:var(--near)"></i><span id="hNear"></span></span><span><i style="background:var(--miss)"></i><span id="hMiss"></span></span></div>
+<div class="kb" id="kb"></div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+// 5-letter words, written for this game
+const WORDS={
+ tr:`ARABA ELMAS KALEM KİTAP SINIF ÇİÇEK GÜNEŞ BULUT DENİZ ORMAN NEHİR KÖPEK TAVUK ASLAN ZEBRA BALIK HAVUÇ ARMUT KİRAZ LİMON KAVUN BİBER SOĞAN EKMEK ÇORBA PİLAV BÖREK SİMİT PASTA ŞEKER MASAL KÖPRÜ SAHİL BAHAR ÇANTA ŞAPKA ÇORAP CEKET KAZAK DOLAP YATAK BANYO SALON BAHÇE TARLA ŞEHİR DÜNYA ROKET MOTOR ROBOT MÜZİK ŞARKI DAVUL GİTAR RESİM FIRÇA KAĞIT SİLGİ TAHTA SINAV KARNE HAYAL SEVGİ TEYZE KOMŞU POLİS PİLOT HAKEM TENİS YÜZME ZAMAN HAFTA YARIN SABAH AKŞAM BEYAZ SİYAH YEŞİL PEMBE KARGA SERÇE ŞAHİN YILAN GEYİK TİLKİ KOYUN HOROZ ÖRDEK BÖCEK SİNEK`.split(' '),
+ en:`APPLE BEACH BRAIN BREAD BRUSH CANDY CHAIR CHALK CLOUD CLOCK CRANE DANCE DREAM EAGLE EARTH FIELD FLAME FRUIT GHOST GIANT GRAPE GRASS HEART HORSE HOUSE JUICE KNIFE LEMON LIGHT MAGIC MONEY MOUSE MUSIC NIGHT OCEAN PAINT PAPER PIANO PIZZA PLANE PLANT QUEEN RIVER ROBOT SCARF SHARK SHEEP SHIRT SMILE SNAKE SPACE SPOON STORM SUGAR TABLE TIGER TOAST TRAIN TRUCK WATER WHALE WORLD ZEBRA STONE STORY SWEET TOWER CROWN CANOE CAMEL BERRY BLOCK BOARD CHESS CREAM DRESS FENCE FLOOR GLASS GLOVE HONEY LASER MANGO MAPLE MEDAL METAL NURSE ONION ORBIT OTTER PANDA PEACH PEARL PILOT PLATE RADIO SALAD SAUCE SHELL SKATE SLIDE SNACK SOLAR SPORT STAMP STEAM SUNNY TEETH THUMB TORCH TULIP UNCLE VOICE WAGON WHEEL YACHT`.split(' '),
+};
+const KEYS={tr:['ERTYUIOPĞÜ','ASDFGHJKLŞİ','ZCVBNMÖÇ'],en:['QWERTYUIOP','ASDFGHJKL','ZXCVBNM']};
+const T={tr:{daily:'Günün vakası',practice:'Antrenman',streak:n=>n?`Seri: ${n} gün`:'',short:'5 harf yaz',win:['DÂHİYANE!','HARİKA!','ÇOK İYİ!','GÜZEL!','İYİ!','KIL PAYI!'],lose:'Kelime: ',again:'Yeni kelime',tomorrow:'Yarın yeni vaka var',hit:'Doğru yerde',near:'Kelimede var',miss:'Yok',solved:n=>`${n}. denemede çözdün.`},
+       en:{daily:'Case of the day',practice:'Practice',streak:n=>n?`Streak: ${n} day${n>1?'s':''}`:'',short:'Type 5 letters',win:['GENIUS!','BRILLIANT!','GREAT!','NICE!','GOOD!','PHEW!'],lose:'The word was ',again:'New word',tomorrow:'A new case comes tomorrow',hit:'Right spot',near:'In the word',miss:'Not in it',solved:n=>`Solved in ${n} ${n>1?'tries':'try'}.`}};
+const up=(s,l)=>l==='tr'?s.toLocaleUpperCase('tr-TR'):s.toUpperCase();
+let st={lang:'tr',mode:'daily'};try{Object.assign(st,JSON.parse(localStorage.getItem('wdPrefs')||'{}'))}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem('wdPrefs',JSON.stringify({lang:st.lang,mode:st.mode}))}catch(e){}};
+const dayNo=()=>Math.floor((Date.now()-new Date().getTimezoneOffset()*6e4)/864e5);
+const list=()=>WORDS[st.lang].filter(w=>[...w].length===5);
+let G=null;
+function load(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}
+function put(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function newGame(){
+  const L=list();let answer;
+  if(st.mode==='daily'){const d=dayNo();answer=L[(d*7919)%L.length];const saved=load('wdDaily:'+st.lang);
+    G=saved&&saved.day===d&&saved.answer===answer?saved:{day:d,answer,guesses:[],cur:'',done:false,won:false};}
+  else{const saved=load('wdPractice:'+st.lang);G=saved&&!saved.done?saved:{answer:L[Math.random()*L.length|0],guesses:[],cur:'',done:false,won:false}}
+  G.cur=G.cur||'';draw();
+}
+const persist=()=>put(st.mode==='daily'?'wdDaily:'+st.lang:'wdPractice:'+st.lang,G);
+// green first, then yellow only as many times as the letter is left over
+function score(guess,answer){
+  const g=[...guess],a=[...answer],res=Array(5).fill('miss'),left={};
+  g.forEach((c,i)=>{if(c===a[i])res[i]='hit';else left[a[i]]=(left[a[i]]||0)+1});
+  g.forEach((c,i)=>{if(res[i]!=='hit'&&left[c]){res[i]='near';left[c]--}});
+  return res;
+}
+function draw(){
+  const t=T[st.lang];document.documentElement.lang=st.lang;
+  document.querySelectorAll('[data-lang]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.lang===st.lang)));
+  document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===st.mode)));
+  $('mDaily').textContent=st.lang==='tr'?'Günlük':'Daily';$('mPractice').textContent=st.lang==='tr'?'Antrenman':'Practice';
+  $('caseNo').textContent=st.mode==='daily'?`${t.daily} #${G.day%1000}`:t.practice;
+  const sk=load('wdStreak:'+st.lang)||{n:0,last:0};$('streak').textContent=t.streak(sk.last>=dayNo()-1?sk.n:0);
+  $('hHit').textContent=t.hit;$('hNear').textContent=t.near;$('hMiss').textContent=t.miss;
+  const rows=[];
+  for(let r=0;r<6;r++){
+    const g=G.guesses[r],cur=r===G.guesses.length&&!G.done?[...G.cur]:null,res=g?score(g,G.answer):null,ch=g?[...g]:cur||[];
+    rows.push(`<div class="row" data-r="${r}">${Array.from({length:5},(_,i)=>`<div class="t ${res?res[i]:ch[i]?'full':''}">${ch[i]||''}</div>`).join('')}</div>`);
+  }
+  $('grid').innerHTML=rows.join('');
+  // keyboard colours: best result so far for each letter
+  const best={},rank={miss:1,near:2,hit:3};
+  for(const g of G.guesses){score(g,G.answer).forEach((r,i)=>{const c=[...g][i];if(!best[c]||rank[r]>rank[best[c]])best[c]=r})}
+  const back='⌫',enter=st.lang==='tr'?'GİR':'ENTER';
+  $('kb').innerHTML=KEYS[st.lang].map((row,i)=>`<div class="kr">${i===2?`<button class="k wide" data-k="enter">${enter}</button>`:''}${[...row].map(c=>`<button class="k ${best[c]||''}" data-k="${c}">${c}</button>`).join('')}${i===2?`<button class="k wide" data-k="back" aria-label="Delete">${back}</button>`:''}</div>`).join('');
+  $('end').hidden=!G.done;
+  if(G.done){$('endTitle').textContent=G.won?t.win[G.guesses.length-1]:t.lose+G.answer;$('endText').textContent=G.won?t.solved(G.guesses.length):'';
+    if(st.mode==='daily'){$('endBtn').textContent=st.lang==='tr'?'Antrenman yap':'Play practice';$('endText').textContent+=' '+t.tomorrow}else $('endBtn').textContent=t.again}
+}
+function say(m){$('msg').textContent=m;clearTimeout(say.t);say.t=setTimeout(()=>$('msg').textContent='',1800)}
+let AC=null;function beep(f,d=.06){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.05,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02)}catch(e){}}
+function press(k){
+  if(!G||G.done)return;
+  if(k==='back'){G.cur=[...G.cur].slice(0,-1).join('');draw();return}
+  if(k==='enter'){
+    if([...G.cur].length<5){const row=document.querySelector(`.row[data-r="${G.guesses.length}"]`);row&&row.classList.add('shake');say(T[st.lang].short);return}
+    G.guesses.push(G.cur);G.cur='';
+    if(G.guesses[G.guesses.length-1]===G.answer){G.done=true;G.won=true;beep(880,.15);setTimeout(()=>beep(1175,.2),120)}
+    else if(G.guesses.length>=6){G.done=true;beep(200,.3)}
+    else beep(520);
+    if(G.done&&st.mode==='daily'){const sk=load('wdStreak:'+st.lang)||{n:0,last:0};if(sk.last!==G.day){const n=G.won?(sk.last===G.day-1?sk.n+1:1):0;put('wdStreak:'+st.lang,{n,last:G.won?G.day:sk.last})}}
+    persist();draw();return}
+  if([...G.cur].length>=5)return;
+  G.cur+=k;persist();draw();
+  const tiles=document.querySelectorAll(`.row[data-r="${G.guesses.length}"] .t`);const t=tiles[[...G.cur].length-1];t&&t.classList.add('pop');
+}
+$('kb').addEventListener('click',e=>{const k=e.target.closest('[data-k]');if(k)press(k.dataset.k)});
+addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==='Enter'){e.preventDefault();if(G.done)$('endBtn').click();else press('enter');return}
+  if(e.key==='Backspace'){press('back');return}
+  if(e.key.length===1){const c=up(e.key,st.lang);if(KEYS[st.lang].join('').includes(c))press(c)}});
+document.querySelectorAll('[data-lang]').forEach(b=>b.onclick=()=>{st.lang=b.dataset.lang;savePrefs();newGame()});
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{st.mode=b.dataset.mode;savePrefs();newGame()});
+$('endBtn').onclick=()=>{if(st.mode==='daily'){st.mode='practice';savePrefs();newGame()}else{put('wdPractice:'+st.lang,null);newGame()}};
+newGame();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

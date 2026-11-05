@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0820">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kuzey Arcade">
+<title>Tower Stack</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Chakra+Petch:wght@400;600&display=swap">
+<style>
+/* Layout: a full-screen night sky. The tower grows in the middle, the score floats on top, and taps anywhere drop the block. Dark only, like the rest of the arcade. */
+:root{--night:#0b0820;--panel:#151036;--line:#2c2468;--ink:#ecebff;--mute:#9a94c9;--gold:#ffd23f;--pink:#ff3d9a;
+  --display:'Orbitron',ui-monospace,monospace;--body:'Chakra Petch',system-ui,sans-serif;color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;touch-action:manipulation}
+body{background:var(--night);color:var(--ink);font-family:var(--body);user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hud{position:fixed;left:0;right:0;top:calc(14px + env(safe-area-inset-top,0px));text-align:center;pointer-events:none}
+.hud b{display:block;font-family:var(--display);font-weight:900;font-size:clamp(48px,12vw,84px);line-height:1;text-shadow:0 0 24px rgba(255,210,63,.4)}
+.hud span{color:var(--mute);font-weight:600;letter-spacing:.08em}
+.combo{position:fixed;left:50%;top:38%;transform:translateX(-50%);font-family:var(--display);font-weight:900;font-size:28px;color:var(--gold);pointer-events:none;opacity:0;transition:opacity .2s}
+.combo.on{opacity:1}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;background:rgba(11,8,32,.72);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.screen h1{font-family:var(--display);font-weight:900;font-size:clamp(32px,8vw,56px);margin:0;letter-spacing:.04em;background:linear-gradient(90deg,var(--gold),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.screen p{margin:0;color:var(--mute);max-width:34ch;font-size:17px}
+.big{font-family:var(--display);font-size:56px;font-weight:900;color:var(--gold)}
+.btn{font-family:var(--display);font-weight:900;letter-spacing:.1em;border:0;border-radius:8px;padding:14px 28px;font-size:16px;cursor:pointer;background:var(--gold);color:var(--night)}
+a.back{color:var(--mute);text-decoration:none;font-family:var(--display);font-size:12px;letter-spacing:.1em}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="hud" id="hud" hidden><b id="score">0</b><span id="best">BEST 0</span></div>
+<div class="combo" id="combo">PERFECT!</div>
+<div class="screen" id="start">
+  <h1>TOWER STACK</h1>
+  <p>Tap to drop the sliding block. Whatever hangs over the edge falls off. Land it perfectly to keep it wide.</p>
+  <button class="btn" id="go">PLAY</button>
+  <a class="back" href="./">BACK TO ARCADE</a>
+</div>
+<div class="screen" id="over" hidden>
+  <h1 id="overTitle">TOWER DOWN</h1>
+  <div class="big" id="final">0</div>
+  <p id="overSub"></p>
+  <button class="btn" id="again">PLAY AGAIN</button>
+  <a class="back" href="./">BACK TO ARCADE</a>
+</div>
+<script>
+(()=>{
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d');
+let W=0,H=0,dpr=1;
+function fit(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}
+addEventListener('resize',fit);fit();
+let best=0;try{best=+localStorage.getItem('stackBest')||0}catch(e){}
+let AC=null;
+function beep(f,d=.08,type='triangle',vol=.06){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;
+  o.type=type;o.frequency.value=f;g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02)}catch(e){}}
+const BH=26; // block height
+let S=null;
+// the tower is in "world" units: x from the left, row 0 is the base
+function newGame(){
+  const w=Math.min(W*.62,300);
+  S={rows:[{x:(W-w)/2,w,hue:280}],cur:null,dir:1,speed:2.2,cam:0,camT:0,falling:[],parts:[],combo:0,dead:false,score:0};
+  spawn();
+}
+function spawn(){
+  const top=S.rows[S.rows.length-1],n=S.rows.length;
+  S.speed=Math.min(7.5,3+n*.13);S.dir=n%2?1:-1;
+  // start at the screen edge, so the block is in view straight away
+  S.cur={x:S.dir>0?0:W-top.w,w:top.w,hue:(280+n*9)%360};
+}
+const rowY=i=>H*.72-i*BH+S.cam;
+function drop(){
+  if(!S||S.dead)return;
+  const top=S.rows[S.rows.length-1],c=S.cur;
+  const l=Math.max(top.x,c.x),r=Math.min(top.x+top.w,c.x+c.w),over=r-l;
+  if(over<=0){ // missed completely
+    S.falling.push({x:c.x,w:c.w,y:rowY(S.rows.length),vy:0,hue:c.hue,rot:0});S.cur=null;return end();
+  }
+  const perfect=Math.abs(c.x-top.x)<5;
+  let x=l,w=over;
+  if(perfect){x=top.x;w=top.w;S.combo++;
+    if(S.combo>=3)w=Math.min(top.w+8,Math.min(W*.62,300)); // a streak of perfects grows the block back a little
+    flash(S.combo>=3?'PERFECT ×'+S.combo:'PERFECT!');beep(520+S.combo*60,.12);
+    for(let k=0;k<16;k++)S.parts.push({x:x+Math.random()*w,y:rowY(S.rows.length),vx:(Math.random()-.5)*4,vy:-Math.random()*3,life:1,hue:c.hue});
+  }else{S.combo=0;beep(320,.06);
+    // the piece that hangs over falls away
+    if(c.x<top.x)S.falling.push({x:c.x,w:top.x-c.x,y:rowY(S.rows.length),vy:0,hue:c.hue,rot:0,vr:-.03});
+    else S.falling.push({x:top.x+top.w,w:c.x+c.w-(top.x+top.w),y:rowY(S.rows.length),vy:0,hue:c.hue,rot:0,vr:.03});
+  }
+  S.rows.push({x,w,hue:c.hue});S.score=S.rows.length-1;$('score').textContent=S.score;
+  if(S.rows.length>6)S.camT=(S.rows.length-6)*BH;
+  spawn();
+}
+let flashT=null;
+function flash(t){$('combo').textContent=t;$('combo').classList.add('on');clearTimeout(flashT);flashT=setTimeout(()=>$('combo').classList.remove('on'),600)}
+function end(){
+  S.dead=true;beep(140,.5,'sawtooth',.06);
+  const isBest=S.score>best;if(isBest){best=S.score;try{localStorage.setItem('stackBest',best)}catch(e){}}
+  setTimeout(()=>{$('overTitle').textContent=isBest&&S.score>0?'NEW BEST!':'TOWER DOWN';$('final').textContent=S.score;
+    $('overSub').textContent=S.score?`${S.score} block${S.score===1?'':'s'} high. Best: ${best}.`:'Wait until the block is over the tower, then tap.';
+    $('over').hidden=false;$('hud').hidden=true;$('again').focus()},700);
+}
+function frame(){
+  ctx.clearRect(0,0,W,H);
+  // sky: darker as the tower grows
+  const g=ctx.createLinearGradient(0,0,0,H),h=S?Math.min(1,S.rows.length/40):0;
+  g.addColorStop(0,`hsl(${250-h*40},60%,${8+h*2}%)`);g.addColorStop(1,`hsl(${280-h*60},55%,${16-h*6}%)`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  for(let k=0;k<60;k++){const sx=(k*137.5)%W,sy=((k*89.3)%H+(S?S.cam*.2:0))%H;ctx.fillStyle=`rgba(236,235,255,${.15+(k%5)*.06})`;ctx.fillRect(sx,sy,2,2)}
+  if(!S){requestAnimationFrame(frame);return}
+  S.cam+=(S.camT-S.cam)*.12;
+  if(S.cur&&!S.dead){S.cur.x+=S.dir*S.speed;const top=S.rows[S.rows.length-1];
+    if(S.cur.x>W-S.cur.w&&S.dir>0)S.dir=-1;if(S.cur.x<0&&S.dir<0)S.dir=1;void top}
+  const block=(x,y,w,hue,a=1)=>{ctx.globalAlpha=a;ctx.fillStyle=`hsl(${hue},85%,58%)`;ctx.fillRect(x,y,w,BH-2);ctx.fillStyle=`hsl(${hue},90%,72%)`;ctx.fillRect(x,y,w,5);ctx.fillStyle=`hsl(${hue},70%,40%)`;ctx.fillRect(x,y+BH-6,w,4);ctx.globalAlpha=1};
+  // ground
+  ctx.fillStyle='#151036';ctx.fillRect(0,rowY(0)+BH-2,W,H);
+  S.rows.forEach((r,i)=>{const y=rowY(i);if(y>-BH&&y<H)block(r.x,y,r.w,r.hue)});
+  if(S.cur&&!S.dead){ctx.shadowColor=`hsl(${S.cur.hue},90%,60%)`;ctx.shadowBlur=18;block(S.cur.x,rowY(S.rows.length),S.cur.w,S.cur.hue);ctx.shadowBlur=0}
+  for(const f of S.falling){f.vy+=.5;f.y+=f.vy;f.rot+=f.vr||0;ctx.save();ctx.translate(f.x+f.w/2,f.y+BH/2);ctx.rotate(f.rot);block(-f.w/2,-BH/2,f.w,f.hue,.9);ctx.restore()}
+  S.falling=S.falling.filter(f=>f.y<H+100);
+  for(const p of S.parts){p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.03;ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=`hsl(${p.hue},90%,70%)`;ctx.fillRect(p.x,p.y,3,3)}
+  ctx.globalAlpha=1;S.parts=S.parts.filter(p=>p.life>0);
+  requestAnimationFrame(frame);
+}
+function start(){$('start').hidden=true;$('over').hidden=true;$('hud').hidden=false;newGame();$('score').textContent=0;$('best').textContent='BEST '+best;beep(660,.1)}
+$('go').onclick=e=>{e.stopPropagation();start()};$('again').onclick=e=>{e.stopPropagation();start()};
+addEventListener('pointerdown',e=>{if(e.target.closest('.screen'))return;drop()});
+addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'||e.key==='ArrowDown'){if(!$('start').hidden||!$('over').hidden){if(e.key!==' ')return;e.preventDefault();start();return}e.preventDefault();drop()}});
+requestAnimationFrame(frame);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

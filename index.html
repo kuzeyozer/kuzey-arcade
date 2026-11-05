@@ -46,7 +46,7 @@ h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vw,64px);lin
 <div class="wrap">
   <header>
     <h1>KUZEY ARCADE</h1>
-    <p class="sub">Two games, made with Claude. They work offline once you've opened them.</p>
+    <p class="sub">Five games, made with Claude. They work offline once you've opened them.</p>
   </header>
 
   <div class="games">
@@ -57,6 +57,18 @@ h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,9vw,64px);lin
     <a class="game" href="temples.html" style="--acc:var(--gold)">
       <canvas id="c2" width="160" height="90" aria-hidden="true"></canvas>
       <div class="info"><h2>Five Temples</h2><p>Pick an element and fight five temple bosses from the Elementals mod.</p><span class="play">PLAY</span></div>
+    </a>
+    <a class="game" href="stack.html" style="--acc:var(--pink)">
+      <canvas id="c3" width="160" height="90" aria-hidden="true"></canvas>
+      <div class="info"><h2>Tower Stack</h2><p>Tap to drop the sliding block. Land it perfectly or the edge falls off. How high can you build?</p><span class="play">PLAY</span></div>
+    </a>
+    <a class="game" href="dodger.html" style="--acc:var(--cyan)">
+      <canvas id="c4" width="160" height="90" aria-hidden="true"></canvas>
+      <div class="info"><h2>Space Dodger</h2><p>Steer through asteroids, grab coins and buy upgrades: shields, a coin magnet and faster engines.</p><span class="play">PLAY</span></div>
+    </a>
+    <a class="game" href="words.html" style="--acc:#e8b330">
+      <canvas id="c5" width="160" height="90" aria-hidden="true"></canvas>
+      <div class="info"><h2>Word Detective</h2><p>Find the hidden 5-letter word in 6 tries, in Turkish or English. A new case every day.</p><span class="play">PLAY</span></div>
     </a>
   </div>
 
@@ -90,7 +102,17 @@ function temple(t){const x=c2;for(let j=0;j<9;j++)for(let i=0;i<16;i++){x.fillSt
   const bob=still?0:Math.sin(t/300)*2;B.forEach((r,j)=>[...r].forEach((k,i)=>{if(P[k]){x.fillStyle=P[k];x.fillRect(80-18+i*3,20+j*3+bob,3,3)}}));
   for(let i=0;i<8;i++){const a=t/700+i*.785;x.fillStyle='#ff9a2e';x.fillRect(80+Math.cos(a)*(30+((t/20)%40))-2,38+Math.sin(a)*(30+((t/20)%40))*.6-2,4,4)}
   x.fillStyle='#bfe8ff';x.fillRect(76,72,8,10);x.fillStyle='#e7b48a';x.fillRect(77,68,6,5)}
-function loop(t){snake(t);temple(t);if(!still)requestAnimationFrame(loop)}requestAnimationFrame(loop);
+const c3=document.getElementById('c3').getContext('2d'),c4=document.getElementById('c4').getContext('2d'),c5=document.getElementById('c5').getContext('2d');
+function stackP(t){const x=c3;x.fillStyle='#1a1040';x.fillRect(0,0,160,90);for(let i=0;i<6;i++){const w=70-i*4,off=Math.sin(i*1.7)*4;x.fillStyle=`hsl(${280+i*14},85%,58%)`;x.fillRect(45+off+(70-w)/2,78-i*10,w,9)}
+  const sx=still?40:40+Math.sin(t/500)*40;x.fillStyle='hsl(360,85%,62%)';x.shadowColor='#ff3d9a';x.shadowBlur=8;x.fillRect(sx,12,48,9);x.shadowBlur=0}
+function dodgeP(t){const x=c4;x.fillStyle='#05061a';x.fillRect(0,0,160,90);for(let i=0;i<30;i++){x.fillStyle='rgba(236,235,255,.6)';x.fillRect((i*53)%160,((i*37)+(still?0:t/20))%90,1,2)}
+  [[30,20,9],[110,40,12],[70,8,6]].forEach(([a,b,r],i)=>{x.fillStyle='#5e5573';x.beginPath();x.arc(a,(b+(still?0:t/12*(1+i*.3)))%100-5,r,0,7);x.fill()});
+  x.fillStyle='#ffd23f';x.beginPath();x.arc(120,((still?0:t/14)+10)%100-5,4,0,7);x.fill();
+  const px=80+(still?0:Math.sin(t/600)*30);x.fillStyle='#3ef0ff';x.shadowColor='#3ef0ff';x.shadowBlur=8;x.beginPath();x.moveTo(px,62);x.lineTo(px+8,80);x.lineTo(px,76);x.lineTo(px-8,80);x.fill();x.shadowBlur=0}
+function wordP(t){const x=c5;x.fillStyle='#0b0820';x.fillRect(0,0,160,90);const rows=[['K','A','L','E','M'],['K','İ','T','A','P']],cols=[['#3a3552','#e8b330','#3a3552','#3a3552','#3a3552'],['#2fbf71','#2fbf71','#2fbf71','#2fbf71','#2fbf71']];
+  const show=still?2:Math.min(2,Math.floor(t/900)%3+1);x.font='900 14px Orbitron, monospace';x.textAlign='center';x.textBaseline='middle';
+  for(let r=0;r<3;r++)for(let c=0;c<5;c++){const X=27+c*22,Y=12+r*24;x.fillStyle=r<show?cols[r][c]:'#1d1748';x.fillRect(X,Y,19,19);if(r<show){x.fillStyle=r===1?'#05200f':'#ecebff';x.fillText(rows[r][c],X+9.5,Y+10.5)}}}
+function loop(t){snake(t);temple(t);stackP(t);dodgeP(t);wordP(t);if(!still)requestAnimationFrame(loop)}requestAnimationFrame(loop);
 if(matchMedia('(display-mode: standalone)').matches||navigator.standalone){document.getElementById('help').innerHTML='<h2 class="installed">INSTALLED</h2><p class="sub" style="margin:0">Kuzey Arcade is on your home screen. Have fun!</p>'}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
