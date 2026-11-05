@@ -232,6 +232,12 @@ nav.tabs button{position:relative}
 .rolepick small{display:block;color:var(--mute)}
 details summary{cursor:pointer;color:var(--mute);font-size:14px}
 @media (prefers-reduced-motion:reduce){.bar i,.clock{transition:none}}
+
+.upd{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:45;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--ink);color:var(--night);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:calc(100% - 32px);font-weight:700;font-size:15px}
+.upd button{border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:800;cursor:pointer}
+.upd .now{background:var(--glow);color:var(--night)}
+.upd .later{background:transparent;color:inherit;opacity:.75}
 </style>
 </head>
 <body>
@@ -371,7 +377,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px}
     <div class="card"><h2>Homework</h2><div class="posts" id="hwList"></div></div>
     <div class="card"><h2>Announcements</h2><div class="posts" id="annList"></div></div>
   </section>
-  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 4</span></footer>
+  <footer>Missions and points from the BIOGLOW score sheet published by Bilim Kahramanları Derneği. Always check the official rules. FIRST® and LEGO® are trademarks of their owners; this app is made by your team, not by them. <span id="ver">Version 5</span></footer>
 </main>
 
 <nav class="tabs" aria-label="Sections">
@@ -1023,9 +1029,29 @@ try{const t=localStorage.getItem('fll:tab');if(t&&$('tab-'+t))showTab(t)}catch(e
 checkInvite();
 if(team)sync();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(team&&now()-lastSync>15000)sync()}else if(dirty){clearTimeout(syncTimer);sync()}});
+/* ---------- updates: wait for a calm moment and keep what's on screen ---------- */
+const UI_KEY='fll:ui';
+let interacted=false,updateReady=false;
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{interacted=true},{once:true,capture:true}));
+const busyNow=()=>tRun||jRun||!!countdown||(typeof newFiles!=='undefined'&&newFiles.length>0);
+function saveUI(){try{sessionStorage.setItem(UI_KEY,JSON.stringify(Object.assign({scroll:scrollY,at:Date.now()},(()=>{const links=[...document.querySelectorAll('#pLinks .row')].map(r=>({t:r.querySelector('.pl-t').value,url:r.querySelector('.pl-u').value})).filter(l=>l.t||l.url);return{team:!$('teamSheet').hidden,post:{kind:postKind,editing,title:$('pTitle').value,body:$('pBody').value,due:$('pDue').value,links,kept:keptFiles},project:Object.fromEntries(PJ.map(([el])=>[el,$(el).value])),note:$('runNote').value}})())))}catch(e){}}
+function applyUpdate(){if(busyNow()){toast('Finish the timer first, then tap Update.');return}saveUI();location.reload()}
+function showUpdate(){
+  if(document.getElementById('upd'))return;
+  const d=document.createElement('div');d.className='upd';d.id='upd';d.setAttribute('role','status');
+  d.innerHTML='<span>A new version of the app is ready.</span><button class="now">Update now</button><button class="later">Later</button>';
+  d.querySelector('.now').onclick=applyUpdate;d.querySelector('.later').onclick=()=>d.remove();document.body.appendChild(d);
+}
+// put back what was on screen before an update
+(()=>{let s=null;try{s=JSON.parse(sessionStorage.getItem(UI_KEY)||'null');sessionStorage.removeItem(UI_KEY)}catch(e){}
+  if(!s||Date.now()-s.at>10*60*1000)return;
+  setTimeout(()=>{try{if(s.post&&(s.post.title||s.post.body||s.post.links.length||s.post.editing)){editing=s.post.editing;setKind(s.post.kind||'hw');$('pTitle').value=s.post.title||'';$('pBody').value=s.post.body||'';$('pDue').value=s.post.due||'';linkRows(s.post.links||[]);keptFiles=Array.isArray(s.post.kept)?s.post.kept:[];paintFiles();if(editing){$('postKind').hidden=true;$('pCancel').hidden=false;$('pPost').textContent='Save changes';$('postTitle').textContent='Edit '+(editing.kind==='hw'?'homework':'announcement')}}if(s.project)for(const [el,v] of Object.entries(s.project))if($(el)&&$(el).value!==v&&canEdit()){$(el).value=v;$(el).dispatchEvent(new Event('input'))}if(s.note)$('runNote').value=s.note;if(s.team)openTeam();}catch(e){}requestAnimationFrame(()=>scrollTo(0,+s.scroll||0));toast('Updated to the newest version')},150)})();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&updateReady&&!busyNow()){saveUI();location.reload()}});
 if('serviceWorker' in navigator){
-  let reloaded=false;const had=!!navigator.serviceWorker.controller;
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!tRun){reloaded=true;location.reload()}});
+  const had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had||updateReady)return;updateReady=true;
+    // right after opening, nothing is in progress yet: update straight away
+    if(!interacted&&performance.now()<5000&&!busyNow()){saveUI();location.reload()}else showUpdate()});
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
 }
 })();
