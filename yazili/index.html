@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141033">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yazılı">
+<title>Yazılı Planı</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* A night-time study desk: day chips on top, a stack of task cards for the chosen day, activities open as a full-screen sheet. Dark only, like the rest of the arcade. */
+:root{
+  --night:#141033; --panel:#1e1849; --panel-hi:#2a2263; --line:#3a3080; --ink:#f4f1ff; --mute:#b1a8db;
+  --gold:#ffd166; --good:#6ee7a8; --bad:#ff7a7a;
+  --tr:#ff9a76; --fen:#6ee7a8; --en:#7cc7ff; --din:#ffd166; --brk:#f0a6ff;
+  --display:'Fredoka', ui-rounded, system-ui, sans-serif; --body:'Nunito', system-ui, sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:radial-gradient(ellipse at 85% -10%,#2b2170 0%,var(--night) 55%) fixed,var(--night);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wrap{max-width:780px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;line-height:1.2;text-wrap:balance}
+.mute{color:var(--mute)}
+header{padding-block:16px 6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;color:inherit;text-decoration:none}
+.brand img{width:40px;height:40px;border-radius:11px}
+.brand h1{font-size:23px}
+.brand p{margin:0;font-size:13px;color:var(--mute)}
+.next{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 14px;font-size:14px;line-height:1.3}
+.next b{font-family:var(--display);font-weight:600;font-size:16px;display:block}
+.tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:5px;margin:12px 0}
+.tabs button{flex:1;border:0;background:none;border-radius:10px;padding:9px 6px;font-family:var(--display);font-weight:600;font-size:16px;cursor:pointer;color:var(--mute)}
+.tabs button[aria-selected=true]{background:var(--panel-hi);color:var(--ink)}
+.days{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-bottom:8px}
+.days::-webkit-scrollbar{display:none}
+.day{flex:0 0 auto;min-width:76px;border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:8px 10px;text-align:center;cursor:pointer;line-height:1.2}
+.day small{display:block;font-size:12px;color:var(--mute)}
+.day b{font-family:var(--display);font-size:20px;font-weight:600}
+.day .st{display:block;font-size:12px;margin-top:2px;color:var(--gold);min-height:15px}
+.day[aria-pressed=true]{background:var(--panel-hi);border-color:var(--gold)}
+.day.today small{color:var(--gold);font-weight:800}
+.dayhead{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:10px 0 12px}
+.dayhead h2{font-size:26px;margin-right:auto}
+.bar{height:10px;background:var(--panel);border-radius:99px;overflow:hidden;border:1px solid var(--line);flex:1 1 160px;max-width:240px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#ffb347);width:0;transition:width .4s}
+.banner{border-radius:14px;padding:12px 14px;margin-bottom:12px;font-size:15px;background:var(--panel);border:1px dashed var(--line)}
+.banner b{color:var(--gold)}
+.tasks{display:flex;flex-direction:column;gap:10px}
+.task{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:14px;padding:12px 12px 12px 14px}
+.task .chk{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:2px solid var(--c);background:none;cursor:pointer;display:grid;place-items:center;font-size:18px;color:#141033}
+.task.done .chk{background:var(--c)}
+.task.done .chk::after{content:"✓";font-weight:800}
+.task .body{flex:1;min-width:0}
+.task .sub{font-size:13px;font-weight:800;color:var(--c)}
+.task h3{font-size:18px}
+.task p{margin:2px 0 0;font-size:14px;color:var(--mute)}
+.task.done h3{text-decoration:line-through;text-decoration-color:var(--c);opacity:.75}
+.go{flex:0 0 auto;border:0;border-radius:12px;padding:10px 14px;font-family:var(--display);font-weight:600;font-size:16px;cursor:pointer;background:var(--c);color:#141033}
+.btn{border:0;border-radius:12px;padding:11px 18px;font-family:var(--display);font-weight:600;font-size:17px;cursor:pointer;background:var(--gold);color:#241a00}
+.btn.quiet{background:var(--panel-hi);color:var(--ink);border:1px solid var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.group{margin-bottom:18px}
+.group h2{font-size:21px;margin-bottom:8px;color:var(--c)}
+.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.set{text-align:left;background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:14px;padding:12px;cursor:pointer}
+.set b{font-family:var(--display);font-weight:600;font-size:17px;display:block}
+.set span{font-size:13px;color:var(--mute)}
+.exam{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.exam .when{flex:0 0 92px;font-family:var(--display);line-height:1.2}
+.exam .when b{font-size:18px;font-weight:600;display:block}
+.exam .when span{font-size:13px;color:var(--mute)}
+.exam h3{font-size:18px}
+.exam p{margin:0;font-size:14px;color:var(--mute)}
+.exam.past{opacity:.55}
+.tag{display:inline-block;font-size:12px;font-weight:800;border-radius:99px;padding:2px 9px;background:var(--panel-hi);color:var(--mute);margin-left:6px;vertical-align:2px}
+.tag.cd{background:var(--gold);color:#241a00}
+.donelist{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:15px}
+/* activity sheet */
+.sheet{position:fixed;inset:0;background:var(--night);z-index:10;overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+.sheet header{position:sticky;top:0;background:var(--night);z-index:2;border-bottom:1px solid var(--line);padding-block:10px;margin-bottom:16px}
+.sheet header .wrap{display:flex;align-items:center;gap:10px;width:100%}
+.sheet header h2{font-size:20px;margin-right:auto;color:var(--c)}
+.x{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 14px;cursor:pointer;font-weight:800}
+.notes{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 18px;margin-bottom:16px}
+.notes h3{font-size:19px;color:var(--c);margin:6px 0 4px}
+.notes ul{margin:4px 0 8px;padding-left:20px}
+.notes li{margin:3px 0}
+.notes .ex{color:var(--mute);font-style:italic}
+.progress{font-size:14px;color:var(--mute);margin-bottom:8px}
+.passage{background:#fff8e8;color:#2a2340;border-radius:14px;padding:14px 16px;margin-bottom:14px;font-size:16px}
+.visual{font-size:46px;text-align:center;background:var(--panel);border-radius:14px;padding:10px;margin-bottom:12px;line-height:1.3}
+.visual small{display:block;font-size:16px;font-weight:800;color:var(--gold)}
+.q{font-family:var(--display);font-weight:500;font-size:22px;margin-bottom:14px;line-height:1.3}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{text-align:left;border:2px solid var(--line);background:var(--panel);border-radius:14px;padding:13px 16px;cursor:pointer;font-size:17px}
+.opt:hover:not([disabled]){border-color:var(--c)}
+.opt.right{border-color:var(--good);background:#1c4a3d}
+.opt.wrong{border-color:var(--bad);background:#4d1f33}
+.opt[disabled]{cursor:default}
+.feedback{margin-top:14px;border-radius:14px;padding:12px 16px;font-size:16px}
+.feedback.ok{background:#1c4a3d}
+.feedback.no{background:#4d1f33}
+.result{text-align:center;padding:20px 0}
+.result .big{font-family:var(--display);font-size:64px;font-weight:700;color:var(--gold);line-height:1}
+.result p{font-size:18px}
+.card3d{perspective:1200px;margin:6px auto 16px;max-width:520px;cursor:pointer}
+.flip{position:relative;height:250px;transition:transform .45s;transform-style:preserve-3d}
+.flip.on{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:20px;display:grid;place-items:center;text-align:center;padding:20px;font-size:20px}
+.face.f{background:var(--panel-hi);border:2px solid var(--c);font-family:var(--display);font-size:30px;font-weight:600}
+.face.b{background:#fff8e8;color:#2a2340;transform:rotateY(180deg)}
+.hint{text-align:center;font-size:14px;color:var(--mute);margin-bottom:12px}
+.center{justify-content:center}
+.play{display:grid;place-items:center;width:110px;height:110px;margin:10px auto;border-radius:50%;border:0;background:var(--c);color:#141033;font-size:44px;cursor:pointer}
+.timer{font-family:var(--display);font-size:72px;font-weight:700;text-align:center;color:var(--brk);line-height:1;margin:10px 0}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+.games a{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;text-decoration:none;color:var(--ink);font-family:var(--display);font-weight:600;text-align:center}
+.games a span{display:block;font-size:30px}
+@media (max-width:520px){
+  .task{flex-wrap:wrap}
+  .task .go{margin-left:46px}
+  .q{font-size:20px}
+  .exam .when{flex-basis:76px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="../" aria-label="Back to Kuzey Arcade">
+      <img src="icons/icon-192.png" alt="">
+      <div><h1>Yazılı Planı</h1><p>1. Dönem 1. Yazılılar · 5. sınıf</p></div>
+    </a>
+    <div class="next" id="next"></div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="plan" aria-selected="true">Plan</button>
+    <button role="tab" data-tab="practice" aria-selected="false">Practice</button>
+    <button role="tab" data-tab="exams" aria-selected="false">Exams</button>
+  </div>
+
+  <section id="tab-plan">
+    <div class="days" id="days"></div>
+    <div class="dayhead"><h2 id="dayTitle"></h2><div class="bar" title="Tasks done"><i id="dayBar"></i></div></div>
+    <div id="dayBanner"></div>
+    <div class="tasks" id="tasks"></div>
+  </section>
+
+  <section id="tab-practice" hidden></section>
+  <section id="tab-exams" hidden></section>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <header><div class="wrap"><h2 id="sheetTitle"></h2><button class="x" id="sheetClose">Close</button></div></header>
+  <div class="wrap" id="sheetBody"></div>
+</div>
+
+<script>
+(()=>{
+// ---------- subjects ----------
+const SUBJ={
+  tr:{name:"Türkçe",c:"var(--tr)"},
+  fen:{name:"Cambridge Science",c:"var(--fen)"},
+  en:{name:"English",c:"var(--en)"},
+  din:{name:"Din Kültürü",c:"var(--din)"},
+  brk:{name:"Break",c:"var(--brk)"}
+};
+
+// ---------- exams still to come ----------
+const EXAMS=[
+  {d:"2026-11-10",t:"09.20–10.00",s:"tr",name:"Türkçe"},
+  {d:"2026-11-10",t:"10.15–10.55",s:"tr",name:"Türkçe – Dinleme Sınavı"},
+  {d:"2026-11-11",t:"09.20–10.00",s:"brk",name:"Kültür ve Medeniyetimize Yön Verenler",skip:true},
+  {d:"2026-11-11",t:"11.10–11.50",s:"fen",name:"Cambridge Fen Bilimleri"},
+  {d:"2026-11-12",t:"09.20–10.00",s:"en",name:"Yabancı Dil / İngilizce"},
+  {d:"2026-11-12",t:"10.15–10.55",s:"en",name:"İngilizce – Dinleme Sınavı"},
+  {d:"2026-11-13",t:"09.20–10.00",s:"en",name:"Cambridge İngiliz Dili"},
+  {d:"2026-11-13",t:"10.15–10.55",s:"din",name:"Din Kültürü ve Ahlak Bilgisi"}
+];
+const DONE_ALREADY=["Matematik","Cambridge Matematik","Fen Bilimleri","Sosyal Bilgiler","Almanca","Türkçe konuşma sınavı"];
+
+// ---------- practice sets ----------
+// Quiz questions: o[0] is always the right answer; options are shuffled when shown.
+const P_ARI="Arılar, çiçekten çiçeğe konarak nektar toplar. Bu sırada bacaklarına yapışan polenleri başka çiçeklere taşırlar. Böylece bitkilerin tozlaşmasına yardım ederler. Tozlaşma olmasaydı pek çok meyve ve sebze yetişmezdi. Bilim insanları, arıların sayısının son yıllarda azaldığını söylüyor. Tarım ilaçları ve iklim değişikliği bu azalmanın başlıca sebepleri arasında. Arıları korumak için bahçelerimize çiçek ekebilir, ilaç kullanımını azaltabiliriz.";
+const SETS={
+"tr-yazim":{s:"tr",kind:"quiz",title:"Yazım ve noktalama",
+notes:`<h3>Ayrı mı, bitişik mi?</h3><ul>
+<li><b>de / da</b> bağlaç ise <b>ayrı</b>: “Ben <u>de</u> geldim.” Ek ise bitişik: “Ev<u>de</u> kaldım.” <span class="ex">İpucu: Çıkarınca anlam bozulmuyorsa bağlaçtır → ayrı yaz.</span></li>
+<li><b>ki</b> bağlaç ise ayrı: “Öyle yoruldum <u>ki</u>…” Ek ise bitişik: “masa<u>daki</u>, yarın<u>ki</u>”.</li>
+<li>Soru eki <b>mı / mi / mu / mü</b> her zaman <b>ayrı</b>: “Geldin <u>mi</u>?”</li>
+<li><b>her şey, bir şey</b> ayrı; <b>hiçbir, birkaç, birçok</b> bitişik.</li>
+<li>Sık karışanlar: <b>herkes</b> (herkez değil), <b>yalnız</b> (yanlız değil), <b>yanlış</b> (yalnış değil).</li></ul>
+<h3>Büyük harf ve kesme işareti</h3><ul>
+<li>Cümle ve özel isimler (kişi, şehir, ülke, hayvana verilen ad) büyük harfle başlar.</li>
+<li>Özel isimlere gelen ekler <b>kesme işaretiyle (’)</b> ayrılır: Ankara’ya, Atatürk’ün, Türkiye’de. Cins isimlerde kesme yok: okula, kitabı.</li></ul>
+<h3>Noktalama</h3><ul>
+<li><b>Nokta (.)</b> tamamlanmış cümlenin sonunda.</li>
+<li><b>Virgül (,)</b> sıralanan kelimeler arasında: “defter, kalem, silgi ve cetvel”; hitaptan sonra: “Ali, buraya gel.”</li>
+<li><b>Soru işareti (?)</b> soru cümlesinin sonunda.</li>
+<li><b>Ünlem (!)</b> sevinç, korku, şaşırma, seslenme bildiren cümlelerde: “Eyvah, geç kaldık!”</li>
+<li><b>İki nokta (:)</b> açıklama veya örnek verilecekse: “Şunları aldım: kalem, defter.”</li></ul>`,
+qs:[
+ {q:"Hangi cümlede “de/da”nın yazımı yanlıştır?",o:["Bende seninle sinemaya geleceğim.","Kitabı masada bıraktım.","Ali de bizimle gelecek.","Okulda çok eğlendik."],e:"“ben de” bağlaçtır, ayrı yazılır: “Ben de seninle…”"},
+ {q:"Hangisinde soru eki doğru yazılmıştır?",o:["Bu kitap senin mi?","Ödevini bitirdinmi?","Yarın gelecekmisin?","Sinemaya gidelimmi?"],e:"Soru eki mı/mi/mu/mü her zaman ayrı yazılır."},
+ {q:"Hangisinde kesme işareti doğru kullanılmıştır?",o:["Yazın Antalya’ya gittik.","Okul’a erken geldim.","Kitap’ı bitirdim.","Türkiyenin başkenti Ankaradır."],e:"Antalya özel isimdir, eki kesmeyle ayrılır. “okul” ve “kitap” cins isimdir."},
+ {q:"Hangi kelime doğru yazılmıştır?",o:["yanlış","yalnış","herkez","yanlız"],e:"Doğruları: yanlış, herkes, yalnız."},
+ {q:"Hangisi doğru yazılmıştır?",o:["Her şeyi anlattım.","Hiç bir sorun yok.","Birşey söyle.","Bir kaç gün kaldık."],e:"“her şey” ayrı; “hiçbir”, “birkaç” bitişik; “bir şey” ayrı."},
+ {q:"“Çantama defter kalem silgi ve cetvel koydum.” Bu cümlede virgül nereye konmalı?",o:["“defter” ve “kalem” kelimelerinden sonra","“Çantama” kelimesinden sonra","“silgi” ve “cetvel” kelimelerinden sonra","Hiçbir yere"],e:"Sıralanan kelimeler virgülle ayrılır; son ikisi “ve” ile bağlanır: defter, kalem, silgi ve cetvel."},
+ {q:"Hangi cümlenin sonuna ünlem işareti (!) konmalıdır?",o:["Eyvah, otobüsü kaçırdık","Saat kaçta geleceksin","Kitabı masaya koydum","Yarın okul var mı"],e:"“Eyvah” korku/üzüntü bildirir → ünlem."},
+ {q:"Hangisinde “ki” yanlış yazılmıştır?",o:["Öyle çok çalıştıki sınavı kazandı.","Duydum ki yarın tatilmiş.","Masadaki kitabı uzatır mısın?","Öyle güzel konuştu ki herkes alkışladı."],e:"Bağlaç olan “ki” ayrı yazılır: “çalıştı ki”."},
+ {q:"Hangisinde büyük harf yanlış kullanılmıştır?",o:["Bugün Okula erken gittik.","Annem Ankara’da doğdu.","Kedimin adı Pamuk.","Van Gölü çok büyüktür."],e:"“okul” özel isim değildir, küçük harfle yazılır."},
+ {q:"“Pazardan şunları aldık __ domates, biber, patlıcan.” Boşluğa hangi işaret gelir?",o:["İki nokta (:)","Nokta (.)","Soru işareti (?)","Ünlem (!)"],e:"Örnek/açıklama sıralanacaksa iki nokta konur."}
+]},
+"tr-yazim-cards":{s:"tr",kind:"cards",title:"Doğru yazım kartları",cards:[
+ {f:"herkez / herkes ?",b:"<b>herkes</b>"},{f:"yanlız / yalnız ?",b:"<b>yalnız</b>"},{f:"yalnış / yanlış ?",b:"<b>yanlış</b>"},
+ {f:"hiç bir / hiçbir ?",b:"<b>hiçbir</b> (bitişik)"},{f:"her şey / herşey ?",b:"<b>her şey</b> (ayrı)"},{f:"bir kaç / birkaç ?",b:"<b>birkaç</b> (bitişik)"},
+ {f:"Geldinmi? / Geldin mi?",b:"<b>Geldin mi?</b> Soru eki ayrı."},{f:"Bende geldim / Ben de geldim",b:"<b>Ben de geldim.</b> Bağlaç “de” ayrı."},
+ {f:"İzmir’e / İzmire",b:"<b>İzmir’e</b> Özel isme gelen ek kesmeyle ayrılır."},{f:"şöför / şoför ?",b:"<b>şoför</b>"},
+ {f:"orjinal / orijinal ?",b:"<b>orijinal</b>"},{f:"yarınki / yarın ki ?",b:"<b>yarınki</b> (ek, bitişik)"}
+]},
+"tr-anlam":{s:"tr",kind:"quiz",title:"Kelime anlamı ve söz varlığı",
+notes:`<h3>Bilmediğin kelimenin anlamını tahmin et</h3><ul>
+<li>Kelimenin <b>önündeki ve arkasındaki cümleleri</b> oku; ipucu genelde oradadır.</li>
+<li>Kelimenin yerine tahmin ettiğin anlamı koy: cümle hâlâ mantıklı mı?</li></ul>
+<h3>Yazını zenginleştir</h3><ul>
+<li>“güzel, iyi, çok” yerine daha canlı kelimeler seç: <i>masmavi, pırıl pırıl, rengârenk</i>.</li>
+<li>Deyim, atasözü, benzetme ve eş anlamlı kelimeler kullan.</li></ul>`,
+qs:[
+ {q:"“Dedem bahçedeki <b>fidanları</b> özenle suladı; birkaç yıl sonra hepsi kocaman ağaç olacaktı.” Altı çizili kelimenin anlamı nedir?",o:["Genç, küçük ağaç","Çiçek tohumu","Sebze","Kuru dal"],e:"“kocaman ağaç olacaktı” ipucu: fidan küçük, genç ağaçtır."},
+ {q:"“Yağmurdan sonra ormandaki dar <b>patikada</b> dikkatli yürüdük.” “patika” ne demektir?",o:["Dar yol","Köprü","Nehir","Çadır"],e:"“dar … yürüdük” ipucu: patika, dar yoldur."},
+ {q:"“Kardeşim sınavı kazanınca sevinçten <b>havalara uçtu</b>.” Deyimin anlamı nedir?",o:["Çok sevinmek","Uçağa binmek","Çok korkmak","Yüksekten atlamak"],e:"“sevinçten” kelimesi ipucu verir."},
+ {q:"“Ali çok <b>cömert</b> biridir; harçlığını bile arkadaşlarıyla paylaşır.” “cömert” ne demektir?",o:["Eli açık, paylaşmayı seven","Cimri","Utangaç","Tembel"],e:"“paylaşır” ipucu: cömert = eli açık."},
+ {q:"Hangi cümle söz varlığı bakımından en zengindir?",o:["Gökyüzü masmavi, güneş pırıl pırıldı; serin bir rüzgâr yüzümüzü okşuyordu.","Hava güzeldi.","Hava çok çok güzeldi.","Güzel bir havaydı."],e:"Renkli sıfatlar ve benzetmeler anlatımı zenginleştirir."},
+ {q:"“Damlaya damlaya göl olur.” atasözünün anlamı nedir?",o:["Küçük birikimler zamanla büyür.","Yağmur çok yağınca göl oluşur.","Su israf edilmemelidir.","Göller damlalardan oluşmaz."],e:"Az az biriktirilen şey zamanla çoğalır."},
+ {q:"“Kitaba şöyle bir <b>göz attım</b>.” Deyimin anlamı nedir?",o:["Kısaca bakmak","Çok dikkatli okumak","Gözünü kapatmak","Kitabı atmak"],e:"Göz atmak = üstünkörü, kısaca bakmak."},
+ {q:"“Bahçemizde <b>kocaman</b> bir çınar var.” cümlesinde “kocaman” yerine hangisi gelebilir?",o:["çok büyük","minik","ince","kısa"],e:"Eş anlamlı: kocaman = çok büyük."},
+ {q:"“cesur” kelimesinin zıt anlamlısı hangisidir?",o:["korkak","yiğit","güçlü","akıllı"],e:"cesur ↔ korkak. (yiğit eş anlamlıdır.)"}
+]},
+"tr-okuma":{s:"tr",kind:"quiz",title:"Metin, anahtar kelime ve görsel",
+notes:`<h3>Okuma sorularında</h3><ul>
+<li><b>Yüzey anlam:</b> Cevap metinde açıkça yazılıdır. Soruyu oku, sonra metinde o bilgiyi bul.</li>
+<li><b>Anahtar kelime:</b> Metnin konusunu en iyi anlatan, en çok tekrar eden önemli kelimeler.</li>
+<li><b>Konu:</b> Metin neyi anlatıyor? <b>Ana fikir:</b> Yazar bize ne söylemek istiyor?</li>
+<li><b>Görsel:</b> Resimdeki işaretlere, renklere ve yazılara bak; mesajı tek cümleyle söyle.</li></ul>`,
+qs:[
+ {p:P_ARI,q:"Metne göre arılar polenleri nasıl taşır?",o:["Bacaklarına yapışan polenleri başka çiçeklere götürerek","Ağızlarında taşıyarak","Rüzgârla uçurarak","Kovanlarında saklayarak"],e:"“bacaklarına yapışan polenleri başka çiçeklere taşırlar”"},
+ {p:P_ARI,q:"Metne göre arıların azalmasının sebepleri nelerdir?",o:["Tarım ilaçları ve iklim değişikliği","Çiçeklerin çok olması","Kışın soğuk olması","Bal üretimi"],e:"Metinde açıkça yazılıdır."},
+ {p:P_ARI,q:"Bu metnin anahtar kelimeleri hangileridir?",o:["arı, polen, tozlaşma","bahçe, bilim, yıl","meyve, sebze, kış","ilaç, insan, ev"],e:"Metin arıların tozlaşmadaki görevini anlatıyor."},
+ {p:P_ARI,q:"Metnin konusu nedir?",o:["Arıların doğadaki önemi ve korunması","Bal nasıl yapılır","Meyve ağaçlarının bakımı","İklim değişikliğinin tarihi"],e:"Metin arıların önemini ve onları nasıl koruyacağımızı anlatıyor."},
+ {p:P_ARI,q:"Metne göre arıları korumak için ne yapabiliriz?",o:["Çiçek ekebilir, ilaç kullanımını azaltabiliriz.","Kovanları kapatabiliriz.","Daha çok bal yiyebiliriz.","Arıları evde besleyebiliriz."],e:"Son cümlede yazıyor."},
+ {v:"🚲 🚫<small>PARK GİRİŞİ</small>",q:"Bir parkın girişinde bu işaret var. Görsel ne anlatıyor?",o:["Parka bisikletle girilmez.","Parkta bisiklet kiralanır.","Bisiklet yarışı yapılacak.","Bisikletler ücretsizdir."],e:"Üstü çizili/yasak işareti “yapılmaz” demektir."},
+ {v:"🚿 💧 ⏱️<small>“Damla damla göl olur, musluğu kapat!”</small>",q:"Bu afişin mesajı nedir?",o:["Suyu tasarruflu kullanmalıyız.","Duş almak sağlıklıdır.","Göllere gitmeliyiz.","Saat önemlidir."],e:"Musluk, damla ve “kapat” sözü su tasarrufunu anlatır."},
+ {v:"📚 🛋️ 🌙<small>“Her gün 20 dakika”</small>",q:"Bu görselle ne anlatılmak isteniyor?",o:["Her gün düzenli kitap okumalıyız.","Akşamları erken uyumalıyız.","Koltukta oturmak rahattır.","Kitaplar pahalıdır."],e:"Kitap + her gün 20 dakika = okuma alışkanlığı."}
+]},
+"tr-dinle":{s:"tr",kind:"listen",title:"Dinleme: Rize’de bir hafta",lang:"tr-TR",
+text:"Geçen yaz ailemle birlikte Karadeniz'e gittik. Rize'de dedemin çay bahçesinde bir hafta kaldık. Sabahları erkenden kalkıp dedemle çay topladık. Dedem bana, çayın en tepedeki iki yaprak ve bir tomurcuktan toplandığını öğretti. Öğleden sonra yağmur yağdığında evde kitap okuduk. Son gün Ayder Yaylası'na çıktık. Bulutların arasında yürümek bana masallardaki gibi hissettirdi. Bu tatilde emeğin ve doğanın ne kadar değerli olduğunu anladım.",
+qs:[
+ {q:"Yazar tatilde nereye gitti?",o:["Rize’ye","Antalya’ya","İzmir’e","Van’a"],e:"“Rize’de dedemin çay bahçesinde…”"},
+ {q:"Ne kadar kaldılar?",o:["Bir hafta","Bir gün","Bir ay","İki hafta"],e:"“bir hafta kaldık”"},
+ {q:"Çay nasıl toplanır?",o:["En tepedeki iki yaprak ve bir tomurcuk","Bütün yapraklar","Sadece kökler","Çiçekleri"],e:"Dedesi öyle öğretti."},
+ {q:"Yağmur yağınca ne yaptılar?",o:["Evde kitap okudular.","Denize girdiler.","Çay topladılar.","Uyudular."],e:"“evde kitap okuduk”"},
+ {q:"Son gün nereye çıktılar?",o:["Ayder Yaylası’na","Bir dağın zirvesine","Bir kaleye","Bir adaya"],e:"“Ayder Yaylası’na çıktık”"},
+ {q:"Metnin ana fikri nedir?",o:["Emek ve doğa çok değerlidir.","Yağmur can sıkıcıdır.","Çay çok lezzetlidir.","Tatiller kısa sürer."],e:"Son cümle ana fikri söyler."}
+]},
+"fen-gas":{s:"fen",kind:"quiz",title:"Gases",
+notes:`<h3>Solids, liquids and gases</h3><ul>
+<li><b>Solid:</b> fixed shape, fixed volume. Particles packed tightly and only vibrate.</li>
+<li><b>Liquid:</b> fixed volume, but it takes the shape of its container. Particles close but slide past each other.</li>
+<li><b>Gas:</b> no fixed shape, no fixed volume. Particles are <b>far apart</b> and move <b>quickly in all directions</b>.</li></ul>
+<h3>Properties of gases</h3><ul>
+<li>A gas <b>spreads out to fill</b> any container.</li>
+<li>A gas can be <b>squashed (compressed)</b> because there is lots of space between particles.</li>
+<li>Gases <b>flow</b> and <b>have mass</b>: a pumped-up ball is heavier than a flat one.</li>
+<li><b>Diffusion:</b> gas particles spread out, so a smell travels across a room.</li>
+<li>Examples: oxygen, carbon dioxide, water vapour, helium. <b>Air</b> is a mixture of gases.</li>
+<li><b>Evaporation:</b> liquid → gas. <b>Condensation:</b> gas → liquid.</li></ul>`,
+qs:[
+ {q:"Which sentence describes the particles in a gas?",o:["They are far apart and move quickly in all directions.","They are packed tightly and only vibrate.","They are close together and slide past each other.","They do not move at all."],e:"Gas particles have big gaps and move fast."},
+ {q:"Why can a gas be squashed (compressed)?",o:["There is a lot of space between its particles.","Its particles are very hard.","It has a fixed shape.","It is always hot."],e:"The particles can be pushed closer together."},
+ {q:"You put some gas in a closed jar. What happens?",o:["It spreads out to fill the whole jar.","It stays at the bottom.","It makes a fixed shape.","It turns into a solid."],e:"Gases fill any container."},
+ {q:"Which one is a gas at room temperature?",o:["Oxygen","Ice","Milk","Sand"],e:"Ice and sand are solids; milk is a liquid."},
+ {q:"Someone opens a bottle of perfume in a corner. Soon you can smell it across the room. Why?",o:["Gas particles spread out (diffusion).","The perfume turns into a solid.","Sound carries the smell.","The bottle gets bigger."],e:"This spreading is called diffusion."},
+ {q:"Does air have mass?",o:["Yes – a pumped-up ball is heavier than a flat ball.","No – air weighs nothing.","Only cold air has mass.","Only when it is wet."],e:"All gases have mass."},
+ {q:"Water changing into water vapour is called…",o:["evaporation","condensation","melting","freezing"],e:"Liquid → gas = evaporation."},
+ {q:"Which state has a fixed volume but no fixed shape?",o:["Liquid","Solid","Gas","None of them"],e:"Liquids take the shape of their container but keep their volume."},
+ {q:"Which gas do we breathe out more of?",o:["Carbon dioxide","Oxygen","Helium","Water"],e:"We breathe in oxygen and breathe out carbon dioxide."}
+]},
+"fen-digest":{s:"fen",kind:"quiz",title:"The digestive system",
+notes:`<h3>The journey of food</h3><p><b>mouth → oesophagus → stomach → small intestine → large intestine → rectum → anus</b></p><ul>
+<li><b>Mouth:</b> teeth break food into small pieces. <i>Incisors</i> cut, <i>canines</i> tear, <i>molars</i> grind. <b>Saliva</b> makes food soft and wet and starts digestion.</li>
+<li><b>Oesophagus</b> (food pipe): muscles squeeze food down to the stomach.</li>
+<li><b>Stomach:</b> a muscly bag that churns food. Its <b>acid</b> kills germs and helps digest food.</li>
+<li><b>Small intestine:</b> the longest part. Digested food (<b>nutrients</b>) is <b>absorbed into the blood</b>.</li>
+<li><b>Large intestine:</b> <b>water is absorbed</b>.</li>
+<li><b>Rectum</b> stores waste; it leaves the body through the <b>anus</b>.</li>
+<li><b>Liver</b> and <b>pancreas</b> make juices that help digestion.</li>
+<li><b>Digestion</b> = breaking food down into small pieces the body can absorb.</li></ul>`,
+qs:[
+ {q:"What is the correct order?",o:["mouth → oesophagus → stomach → small intestine → large intestine","mouth → stomach → oesophagus → large intestine → small intestine","oesophagus → mouth → stomach → small intestine → large intestine","mouth → small intestine → stomach → oesophagus → large intestine"],e:"Learn the order: mouth, oesophagus, stomach, small intestine, large intestine, rectum, anus."},
+ {q:"Where are nutrients absorbed into the blood?",o:["Small intestine","Large intestine","Oesophagus","Mouth"],e:"The small intestine absorbs digested food."},
+ {q:"What is the main job of the large intestine?",o:["To absorb water","To chew food","To make saliva","To kill germs with acid"],e:"Water is absorbed in the large intestine."},
+ {q:"What does saliva do?",o:["Makes food soft and wet and starts digestion","Absorbs nutrients","Pushes food down to the stomach","Stores waste"],e:"Saliva is made in the mouth."},
+ {q:"Which teeth grind and chew food?",o:["Molars","Incisors","Canines","None"],e:"Incisors cut, canines tear, molars grind."},
+ {q:"What does the oesophagus do?",o:["Carries food from the mouth to the stomach","Absorbs water","Makes acid","Removes waste"],e:"It is the food pipe."},
+ {q:"Why does the stomach contain acid?",o:["To kill germs and help digest food","To absorb water","To make teeth strong","To push food out"],e:"Acid kills germs and breaks down food."},
+ {q:"Digestion means…",o:["breaking food down so the body can absorb it","only chewing food","drinking water","breathing in oxygen"],e:"Food must be broken into tiny pieces to enter the blood."}
+]},
+"fen-diet":{s:"fen",kind:"quiz",title:"Balanced diet",
+notes:`<h3>Nutrients and their jobs</h3><ul>
+<li><b>Carbohydrates</b> – give us <b>energy</b>: bread, rice, pasta, potatoes.</li>
+<li><b>Proteins</b> – help us <b>grow and repair</b> the body: meat, fish, eggs, beans, lentils.</li>
+<li><b>Fats</b> – store energy and keep us warm: butter, oil, cheese, nuts (eat small amounts).</li>
+<li><b>Vitamins and minerals</b> – keep us <b>healthy</b>: fruit and vegetables. <b>Calcium</b> (milk, yoghurt, cheese) makes bones and teeth strong.</li>
+<li><b>Fibre</b> – helps food <b>move through the intestines</b>: wholegrain bread, fruit, vegetables.</li>
+<li><b>Water</b> – every part of the body needs it.</li></ul>
+<p>A <b>balanced diet</b> has all of these in the <b>right amounts</b>. Too much sugar → tooth decay; too much fat and sugar → weight gain.</p>`,
+qs:[
+ {q:"What is the main job of proteins?",o:["Growth and repair","Giving quick energy","Helping food move through the gut","Keeping us cool"],e:"Proteins build and repair the body."},
+ {q:"Which food is rich in carbohydrates?",o:["Pasta","Fish","Butter","Lettuce"],e:"Pasta, bread, rice and potatoes give energy."},
+ {q:"Fibre helps us…",o:["move food through the intestines","grow taller","see in the dark","make saliva"],e:"Fibre keeps digestion working well."},
+ {q:"Which mineral makes bones and teeth strong?",o:["Calcium","Sugar","Fat","Fibre"],e:"Milk, yoghurt and cheese contain calcium."},
+ {q:"What is a balanced diet?",o:["Eating all the nutrient groups in the right amounts","Eating only fruit","Eating a lot of one food","Never eating fat"],e:"Balance = every group, right amounts."},
+ {q:"Which lunch is the most balanced?",o:["Grilled chicken, rice, salad and an orange","Chips, crisps and cola","Cake and chocolate milk","Only bread and butter"],e:"It has protein, carbohydrate, vitamins and fibre."},
+ {q:"Eating too much sugar can cause…",o:["tooth decay","strong bones","better eyesight","more fibre"],e:"Sugar feeds the bacteria that damage teeth."},
+ {q:"Fruit and vegetables mainly give us…",o:["vitamins, minerals and fibre","mostly fat","mostly protein","nothing useful"],e:"Eat lots of fruit and vegetables!"}
+]},
+"fen-all":{s:"fen",kind:"quiz",title:"Science mixed test",mix:["fen-gas","fen-digest","fen-diet"],n:12},
+"fen-words":{s:"fen",kind:"cards",title:"Science key words",cards:[
+ {f:"gas",b:"No fixed shape or volume; particles far apart and moving fast. <i>(gaz)</i>"},
+ {f:"compress",b:"To squash something into a smaller space. Gases can be compressed. <i>(sıkıştırmak)</i>"},
+ {f:"diffusion",b:"Particles spreading out, like a smell filling a room. <i>(yayılma, difüzyon)</i>"},
+ {f:"evaporation",b:"Liquid → gas. <i>(buharlaşma)</i>"},
+ {f:"condensation",b:"Gas → liquid. <i>(yoğuşma)</i>"},
+ {f:"particle",b:"A tiny piece that everything is made of. <i>(tanecik)</i>"},
+ {f:"saliva",b:"Liquid in the mouth that softens food and starts digestion. <i>(tükürük)</i>"},
+ {f:"oesophagus",b:"Food pipe from the mouth to the stomach. <i>(yemek borusu)</i>"},
+ {f:"stomach",b:"Churns food and uses acid to kill germs. <i>(mide)</i>"},
+ {f:"small intestine",b:"Longest part; nutrients are absorbed into the blood. <i>(ince bağırsak)</i>"},
+ {f:"large intestine",b:"Water is absorbed here. <i>(kalın bağırsak)</i>"},
+ {f:"nutrient",b:"Useful substance in food the body needs. <i>(besin ögesi)</i>"},
+ {f:"carbohydrate",b:"Gives energy: bread, rice, pasta. <i>(karbonhidrat)</i>"},
+ {f:"protein",b:"Growth and repair: meat, fish, eggs, beans. <i>(protein)</i>"},
+ {f:"fibre",b:"Helps food move through the intestines. <i>(lif)</i>"},
+ {f:"balanced diet",b:"All the nutrient groups in the right amounts. <i>(dengeli beslenme)</i>"}
+]},
+"en-nature":{s:"en",kind:"cards",title:"Nature & natural resources",cards:[
+ {f:"natural resources",b:"Things from nature that we use: water, air, soil, trees. <i>(doğal kaynaklar)</i>"},
+ {f:"renewable",b:"It won't run out: sun, wind, water power. <i>(yenilenebilir)</i>"},
+ {f:"non-renewable",b:"It will run out one day: coal, oil, gas. <i>(yenilenemez)</i>"},
+ {f:"fossil fuels",b:"Coal, oil and natural gas. <i>(fosil yakıtlar)</i>"},
+ {f:"soil",b:"The top layer of earth where plants grow. <i>(toprak)</i>"},
+ {f:"pollution",b:"Making air, water or land dirty. <i>(kirlilik)</i>"},
+ {f:"recycle",b:"To use old things again to make new ones. <i>(geri dönüştürmek)</i>"},
+ {f:"protect",b:"To keep something safe. <i>(korumak)</i>"},
+ {f:"wildlife",b:"Animals and plants living in nature. <i>(yaban hayatı)</i>"},
+ {f:"endangered",b:"In danger of disappearing for ever. <i>(nesli tükenmekte olan)</i>"},
+ {f:"habitat",b:"The natural home of an animal or plant. <i>(yaşam alanı)</i>"},
+ {f:"solar energy",b:"Energy from the sun. <i>(güneş enerjisi)</i>"},
+ {f:"waste",b:"Things we throw away; or to use too much. <i>(atık / israf etmek)</i>"},
+ {f:"climate",b:"The usual weather of a place over a long time. <i>(iklim)</i>"}
+]},
+"en-verbs":{s:"en",kind:"quiz",title:"Stative and action verbs",
+notes:`<h3>Action verbs</h3><p>Things we <b>do</b>: run, swim, cook, write, play. They can be in the continuous form: <i>I <b>am cooking</b> now.</i></p>
+<h3>Stative verbs</h3><p>Feelings, thoughts, senses and owning: <b>know, like, love, hate, want, need, believe, understand, think</b> (= opinion), <b>own, have</b> (= own), <b>seem, taste, smell</b>.</p>
+<p>We usually <b>don't</b> use them with -ing: ✔ <i>I <b>know</b> the answer.</i> ✘ <i>I am knowing the answer.</i></p>`,
+qs:[
+ {q:"I ___ this song. It's great!",o:["love","am loving","loving","am love"],e:"“love” is stative → present simple."},
+ {q:"Look! The children ___ in the river.",o:["are swimming","swim","swims","swimming"],e:"“Look!” = happening now, and swim is an action verb."},
+ {q:"Which one is a stative verb?",o:["know","run","write","jump"],e:"know = a thought, not an action."},
+ {q:"She ___ the answer.",o:["knows","is knowing","know","knowing"],e:"Stative verb, present simple, she → knows."},
+ {q:"We ___ a new tent for the camping trip.",o:["need","are needing","needing","needs"],e:"need is stative."},
+ {q:"Which sentence is correct?",o:["This soup tastes delicious.","This soup is tasting delicious.","This soup taste delicious.","This soup tasting delicious."],e:"taste (= has a flavour) is stative."},
+ {q:"Right now, my dad ___ dinner.",o:["is cooking","cooks","cook","cooking"],e:"“Right now” + action verb → present continuous."},
+ {q:"I ___ you are right.",o:["think","am thinking","thinking","thinks"],e:"think = opinion → stative."}
+]},
+"en-past":{s:"en",kind:"quiz",title:"Past simple & past continuous",
+notes:`<h3>Past simple</h3><p>A finished action: <i>I <b>visited</b> my grandma yesterday.</i> Irregular: go → <b>went</b>, see → <b>saw</b>, have → <b>had</b>, ring → <b>rang</b>. Negative/question: <b>didn't + verb</b>, <b>Did … + verb?</b></p>
+<h3>Past continuous</h3><p>An action in progress in the past: <b>was/were + -ing</b>. <i>At 8 pm we <b>were watching</b> TV.</i></p>
+<h3>Together</h3><p>Long action (past continuous) interrupted by a short one (past simple):<br><i>I <b>was reading</b> <u>when</u> the phone <b>rang</b>.</i> · <i><u>While</u> she <b>was walking</b> home, it <b>started</b> to rain.</i></p>`,
+qs:[
+ {q:"Yesterday I ___ to the park.",o:["went","go","was go","goed"],e:"go → went."},
+ {q:"I was reading when the phone ___.",o:["rang","was ringing","rings","ring"],e:"Short interrupting action → past simple."},
+ {q:"At 8 pm last night, we ___ TV.",o:["were watching","watched","are watching","was watching"],e:"In progress at a past time; we → were."},
+ {q:"While she ___ home, it started to rain.",o:["was walking","walked","were walking","walks"],e:"While + long action → past continuous; she → was."},
+ {q:"Did you ___ the film last night?",o:["see","saw","seen","seeing"],e:"Did + base verb."},
+ {q:"They ___ football when the teacher came.",o:["were playing","was playing","played","plays"],e:"They → were + -ing."},
+ {q:"We ___ go to school last Sunday.",o:["didn't","don't","weren't","wasn't"],e:"Past simple negative: didn't + verb."},
+ {q:"When I ___ at the station, the train was leaving.",o:["arrived","was arriving","arrive","arrives"],e:"Short action → past simple."},
+ {q:"Which sentence is in the past continuous?",o:["He was sleeping.","He slept.","He sleeps.","He is sleeping."],e:"was/were + -ing."}
+]},
+"en-cond":{s:"en",kind:"quiz",title:"Conditionals, future, goals & jobs",
+notes:`<h3>First conditional – real, possible</h3><p><b>If + present simple, will + verb</b>: <i>If it rains tomorrow, we <b>will stay</b> at home.</i></p>
+<h3>Second conditional – imaginary, unlikely</h3><p><b>If + past simple, would + verb</b>: <i>If I <b>had</b> a million dollars, I <b>would buy</b> a farm.</i> · <i>If I <b>were</b> a bird, I would fly.</i></p>
+<h3>Future</h3><ul><li><b>be going to</b> – plans already decided, or predictions with proof: <i>Look at the clouds! It's <b>going to</b> rain.</i></li>
+<li><b>will</b> – predictions/opinions: <i>I think robots <b>will</b> clean our houses.</i></li></ul>
+<h3>Goals & jobs</h3><p><i>goal, dream, achieve, work hard, vet, architect, engineer, pilot, astronaut, scientist, doctor, chef, journalist</i></p>`,
+qs:[
+ {q:"If it rains tomorrow, we ___ at home.",o:["will stay","would stay","stayed","stay"],e:"First conditional: if + present, will + verb."},
+ {q:"If I had a million dollars, I ___ a big house.",o:["would buy","will buy","buy","bought"],e:"Second conditional: if + past, would + verb."},
+ {q:"If I ___ a bird, I would fly to Paris.",o:["were","am","will be","be"],e:"Second conditional: If I were…"},
+ {q:"If you study hard, you ___ the exam.",o:["will pass","would pass","passed","passing"],e:"Real possibility → first conditional."},
+ {q:"Which sentence is a second conditional?",o:["If I won the lottery, I would travel the world.","If it is sunny, we will go swimming.","I will call you tomorrow.","If you heat ice, it melts."],e:"if + past simple, would + verb."},
+ {q:"Look at those dark clouds! It ___ rain.",o:["is going to","would","rains","rained"],e:"A prediction with proof → going to."},
+ {q:"I've decided. I ___ be a vet when I grow up.",o:["am going to","would","was","am"],e:"A plan already decided → going to."},
+ {q:"I think people ___ live on Mars one day.",o:["will","are","would","did"],e:"An opinion about the future → will."},
+ {q:"A person who looks after sick animals is a…",o:["vet","pilot","chef","journalist"],e:"vet = veteriner."},
+ {q:"A person who designs buildings is an…",o:["architect","astronaut","engineer","author"],e:"architect = mimar."}
+]},
+"en-dinle":{s:"en",kind:"listen",title:"Listening: Emma's trip",lang:"en-GB",
+text:"Hi, I'm Emma. Last Saturday my class went on a trip to the forest. We were walking along a river when we saw a family of ducks. Our teacher told us that forests are very important because trees give us oxygen and homes for animals. After lunch, we picked up rubbish and put it in the recycling bins. In the future, I want to be a scientist. If I become a scientist, I will protect forests and wildlife.",
+qs:[
+ {q:"When did the class go on the trip?",o:["Last Saturday","Last Sunday","Yesterday","Next week"],e:"“Last Saturday…”"},
+ {q:"What were they doing when they saw the ducks?",o:["Walking along a river","Eating lunch","Swimming","Picking up rubbish"],e:"“We were walking along a river when we saw…”"},
+ {q:"Why are forests important?",o:["Trees give us oxygen and homes for animals.","They are good for camping.","They have lots of ducks.","They are quiet."],e:"The teacher said it."},
+ {q:"What did they do after lunch?",o:["Picked up rubbish and recycled it","Went home","Played football","Planted trees"],e:"“we picked up rubbish and put it in the recycling bins”"},
+ {q:"What does Emma want to be?",o:["A scientist","A teacher","A vet","A pilot"],e:"“I want to be a scientist.”"}
+]},
+"en-school":{s:"en",kind:"quiz",title:"School life, likes & telling time",
+notes:`<h3>Obligations</h3><ul><li><b>have to / must</b> – it's necessary: <i>We <b>have to</b> wear a uniform.</i></li>
+<li><b>mustn't</b> – it's not allowed: <i>You <b>mustn't</b> run in the corridors.</i></li>
+<li><b>don't have to</b> – it's not necessary: <i>We <b>don't have to</b> bring lunch.</i></li></ul>
+<h3>Likes and dislikes (+ -ing)</h3><p>love ❤️ · like / enjoy 🙂 · don't mind 😐 · don't like 🙁 · hate / can't stand 😖<br><i>I <b>enjoy reading</b>. She <b>can't stand getting</b> up early.</i></p>
+<h3>Telling the time</h3><p>9:15 = <b>quarter past</b> nine · 3:30 = <b>half past</b> three · 7:45 = <b>quarter to</b> eight · 10:10 = ten past ten · 4:50 = ten to five</p>
+<h3>Present simple</h3><p>Routines and facts: <i>Tom <b>goes</b> to school by bus every day.</i> (he/she/it + -s)</p>`,
+qs:[
+ {q:"Students ___ wear a uniform at our school. It's a rule.",o:["have to","don't have to","mustn't","can't stand"],e:"A rule → have to / must."},
+ {q:"You ___ run in the corridors. It's dangerous.",o:["mustn't","have to","don't have to","must"],e:"Not allowed → mustn't."},
+ {q:"We ___ bring lunch. The school gives us food.",o:["don't have to","mustn't","have to","must"],e:"Not necessary → don't have to."},
+ {q:"Where do you borrow books at school?",o:["Library","Canteen","Gym","Playground"],e:"library = kütüphane."},
+ {q:"Where do students eat lunch?",o:["Canteen","Science lab","Library","Headteacher's office"],e:"canteen = yemekhane."},
+ {q:"Who is in charge of the whole school?",o:["The headteacher","The caretaker","The school nurse","The cook"],e:"headteacher = okul müdürü."},
+ {q:"I love ___ maths problems.",o:["solving","solve","to solved","solves"],e:"love + -ing."},
+ {q:"She can't stand ___ up early.",o:["getting","get","gets","got"],e:"can't stand + -ing."},
+ {q:"It's 7:45. What time is it?",o:["It's quarter to eight.","It's quarter past seven.","It's half past seven.","It's quarter to seven."],e:"15 minutes before eight."},
+ {q:"It's 3:30. What time is it?",o:["It's half past three.","It's half past four.","It's quarter past three.","It's three to thirty."],e:"30 minutes after three."},
+ {q:"It's 9:15. What time is it?",o:["It's quarter past nine.","It's quarter to nine.","It's half past nine.","It's nine to fifteen."],e:"15 minutes after nine."},
+ {q:"Tom ___ to school by bus every day.",o:["goes","go","is go","going"],e:"Routine, he → goes."},
+ {q:"In which lesson do you study maps and countries?",o:["Geography","History","Maths","Music"],e:"geography = coğrafya."},
+ {q:"You use a ___ to draw straight lines.",o:["ruler","rubber","sharpener","glue stick"],e:"ruler = cetvel."}
+]},
+"en-school-words":{s:"en",kind:"cards",title:"School & classroom words",cards:[
+ {f:"library",b:"kütüphane"},{f:"canteen",b:"yemekhane, kantin"},{f:"gym",b:"spor salonu"},{f:"playground",b:"oyun bahçesi"},
+ {f:"science lab",b:"fen laboratuvarı"},{f:"headteacher",b:"okul müdürü"},{f:"caretaker",b:"okul görevlisi, hademe"},{f:"school nurse",b:"okul hemşiresi"},
+ {f:"ruler",b:"cetvel"},{f:"rubber / eraser",b:"silgi"},{f:"sharpener",b:"kalemtıraş"},{f:"pencil case",b:"kalemlik"},
+ {f:"geography",b:"coğrafya"},{f:"history",b:"tarih"},{f:"PE",b:"beden eğitimi"},{f:"ICT",b:"bilişim teknolojileri"},
+ {f:"have to",b:"zorunda olmak"},{f:"mustn't",b:"yasak, yapmamalısın"},{f:"don't have to",b:"zorunda değilsin (gerek yok)"},
+ {f:"quarter past",b:"çeyrek geçiyor (…:15)"},{f:"half past",b:"buçuk (…:30)"},{f:"quarter to",b:"çeyrek var (…:45)"},
+ {f:"can't stand",b:"hiç dayanamamak, nefret etmek"},{f:"don't mind",b:"fark etmez, sorun değil"}
+]},
+"din-duzen":{s:"din",kind:"quiz",title:"Evrendeki düzen ve Allah’ın birliği",
+notes:`<h3>Evrende mükemmel bir düzen var</h3><ul>
+<li>Güneş her gün doğar ve batar; gece ile gündüz birbirini izler.</li>
+<li>Mevsimler sırayla gelir; Ay’ın evreleri hep aynı düzende tekrarlanır.</li>
+<li>Dünya, Güneş’e canlıların yaşayabileceği kadar uzaklıktadır. Daha yakın olsa çok sıcak, daha uzak olsa çok soğuk olurdu.</li>
+<li>Vücudumuzda kalp durmadan çalışır; her organın bir görevi vardır.</li></ul>
+<h3>Akıl yürütme</h3><ul>
+<li>Bir resim bir ressamı, bir bina bir mimarı gösterir. Evrendeki bu düzen de kendiliğinden olamaz; onu yaratan <b>Allah</b>’ı gösterir.</li>
+<li>Düzenin hiç bozulmadan sürmesi, yaratıcının <b>bir</b> olduğunu gösterir: “Eğer yerde ve gökte Allah’tan başka ilahlar olsaydı, ikisinin de düzeni bozulurdu.” <span class="ex">(Enbiyâ suresi, 22. ayet)</span></li>
+<li>Allah’ın bir olduğuna inanmaya <b>tevhid</b> denir.</li></ul>`,
+qs:[
+ {q:"Hangisi evrendeki düzene örnek <b>değildir</b>?",o:["Odamızın dağınık olması","Mevsimlerin sırayla gelmesi","Gece ve gündüzün oluşması","Kalbimizin düzenli atması"],e:"Dağınık oda insanın yaptığı bir şeydir, evrendeki düzene örnek değildir."},
+ {q:"“Bir resim ressamını, bir bina mimarını gösterir.” Bu düşünce ne anlatmak için kullanılır?",o:["Evrendeki düzenin bir yaratıcısı olduğunu","Resim yapmanın zor olduğunu","Binaların çok büyük olduğunu","Herkesin ressam olabileceğini"],e:"Düzen, onu yapan birinin varlığını gösterir."},
+ {q:"Evrendeki düzenin hiç bozulmadan devam etmesi neyi gösterir?",o:["Allah’ın bir (tek) olduğunu","Evrenin kendiliğinden oluştuğunu","Güneş’in çok büyük olduğunu","Düzenin bir gün biteceğini"],e:"Birden fazla yaratıcı olsaydı düzen bozulurdu."},
+ {q:"“Eğer yerde ve gökte Allah’tan başka ilahlar olsaydı, ikisinin de düzeni bozulurdu.” (Enbiyâ, 22) Bu ayet hangi konuyu vurgular?",o:["Allah’ın birliğini","Mevsimleri","Güneş sistemini","Yağmurun önemini"],e:"Ayet tevhidi, yani Allah’ın birliğini anlatır."},
+ {q:"Allah’ın bir olduğuna inanmaya ne denir?",o:["Tevhid","İhlas","Esmaü’l-Hüsna","Dua"],e:"Tevhid = birleme, Allah’ı bir bilme."},
+ {q:"Dünya Güneş’e şimdikinden çok daha yakın olsaydı ne olurdu?",o:["Çok sıcak olur, canlılar yaşayamazdı.","Hiçbir şey değişmezdi.","Daha çok kar yağardı.","Geceler uzardı."],e:"Dünya’nın Güneş’e uzaklığı bile bu düzenin bir parçasıdır."},
+ {q:"Hangisi bir akıl yürütme örneğidir?",o:["“Kumda ayak izleri var, buradan biri geçmiş olmalı.”","“Bugün hava güzel.”","“Elmayı çok severim.”","“Okul saat dokuzda başlar.”"],e:"Gördüğümüz bir izden onu yapanın varlığına ulaşırız."}
+]},
+"din-esma":{s:"din",kind:"cards",title:"Allah’ın güzel isimleri",cards:[
+ {f:"Er-Rahmân",b:"Dünyada bütün canlılara merhamet eden"},
+ {f:"Er-Rahîm",b:"Çok merhametli; ahirette müminlere merhamet eden"},
+ {f:"El-Hâlık",b:"Yaratan, yoktan var eden"},
+ {f:"El-Bâri",b:"Her şeyi kusursuz ve uyumlu yaratan"},
+ {f:"El-Musavvir",b:"Her şeye bir şekil ve özellik veren"},
+ {f:"El-Alîm",b:"Her şeyi bilen"},
+ {f:"El-Hakîm",b:"Her işi yerinde ve hikmetli olan"},
+ {f:"El-Kadîr",b:"Her şeye gücü yeten"},
+ {f:"Er-Rezzâk",b:"Bütün canlılara rızık veren"},
+ {f:"Es-Semî",b:"Her şeyi işiten"},
+ {f:"El-Basîr",b:"Her şeyi gören"},
+ {f:"El-Vedûd",b:"Kullarını çok seven"},
+ {f:"El-Gafûr",b:"Günahları çok bağışlayan"},
+ {f:"El-Hafîz",b:"Her şeyi koruyan"},
+ {f:"El-Vâhid / El-Ehad",b:"Bir ve tek olan, eşi ve benzeri olmayan"},
+ {f:"Es-Samed",b:"Hiçbir şeye muhtaç olmayan, her şeyin O’na muhtaç olduğu"}
+]},
+"din-esmaq":{s:"din",kind:"quiz",title:"Güzel isimler – hangisi?",
+qs:[
+ {q:"“Allah her şeyi bilir, içimizden geçenleri bile.” Bu cümle hangi isimle ilgilidir?",o:["El-Alîm","Er-Rezzâk","El-Basîr","El-Hafîz"],e:"Alîm = her şeyi bilen."},
+ {q:"“Dünyadaki bütün canlıların yiyeceğini Allah verir.”",o:["Er-Rezzâk","El-Gafûr","Es-Semî","El-Hakîm"],e:"Rezzâk = rızık veren."},
+ {q:"“Allah dualarımızı duyar.”",o:["Es-Semî","El-Basîr","El-Kadîr","El-Musavvir"],e:"Semî = her şeyi işiten."},
+ {q:"“Allah karanlık gecede yürüyen bir karıncayı bile görür.”",o:["El-Basîr","Es-Semî","El-Vedûd","Er-Rahmân"],e:"Basîr = her şeyi gören."},
+ {q:"“Hatasından pişman olan kulunu Allah bağışlar.”",o:["El-Gafûr","El-Hâlık","El-Alîm","Es-Samed"],e:"Gafûr = çok bağışlayan."},
+ {q:"“Allah’ın gücünün yetmediği hiçbir şey yoktur.”",o:["El-Kadîr","El-Vedûd","Es-Semî","Er-Rezzâk"],e:"Kadîr = her şeye gücü yeten."},
+ {q:"“Allah tektir; eşi ve benzeri yoktur.”",o:["El-Ehad","El-Basîr","El-Musavvir","El-Hafîz"],e:"Ehad / Vâhid = bir ve tek olan."},
+ {q:"“Her şey O’na muhtaçtır, O hiçbir şeye muhtaç değildir.”",o:["Es-Samed","Er-Rahîm","El-Alîm","El-Bâri"],e:"Samed: İhlas suresinde de geçer."},
+ {q:"“Her insana farklı bir yüz, her çiçeğe farklı bir renk verilmiştir.”",o:["El-Musavvir","Er-Rezzâk","El-Gafûr","Es-Semî"],e:"Musavvir = şekil ve özellik veren."},
+ {q:"“Allah yağmuru bütün insanlara, hayvanlara ve bitkilere gönderir; merhameti herkesedir.”",o:["Er-Rahmân","El-Hakîm","El-Kadîr","El-Basîr"],e:"Rahmân = dünyada bütün canlılara merhamet eden."}
+]},
+"din-ihlas":{s:"din",kind:"quiz",title:"İhlas suresi",
+notes:`<h3>Okunuşu</h3><p><b>Bismillâhirrahmânirrahîm.</b><br>1. Kul hüvallâhü ehad.<br>2. Allâhüs-samed.<br>3. Lem yelid ve lem yûled.<br>4. Ve lem yekün lehû küfüven ehad.</p>
+<h3>Anlamı</h3><p>Rahmân ve Rahîm olan Allah’ın adıyla.<br>1. De ki: O, Allah’tır, bir tektir.<br>2. Allah sameddir (her şey O’na muhtaçtır, O hiçbir şeye muhtaç değildir).<br>3. O, doğurmamış ve doğurulmamıştır.<br>4. Hiçbir şey O’na denk değildir.</p>
+<h3>Bilgiler</h3><ul><li>Kur’an-ı Kerim’in <b>112.</b> suresidir, <b>4 ayettir</b>, Mekke’de inmiştir.</li>
+<li>“İhlas” <b>samimiyet, içtenlik</b> demektir.</li>
+<li>Ana konusu <b>tevhid</b>: Allah’ın bir ve tek olması.</li></ul>`,
+qs:[
+ {q:"İhlas suresi kaç ayettir?",o:["4","7","3","6"],e:"4 ayettir."},
+ {q:"İhlas suresinin ana konusu nedir?",o:["Allah’ın birliği (tevhid)","Namazın önemi","Peygamberlerin hayatı","Ahiret günü"],e:"Sure baştan sona Allah’ın birliğini anlatır."},
+ {q:"“Lem yelid ve lem yûled” ayetinin anlamı nedir?",o:["O, doğurmamış ve doğurulmamıştır.","De ki: O, Allah’tır, bir tektir.","Hiçbir şey O’na denk değildir.","Allah sameddir."],e:"3. ayet."},
+ {q:"“Allâhüs-samed” ayetinin anlamı nedir?",o:["Her şey O’na muhtaçtır, O hiçbir şeye muhtaç değildir.","Allah her şeyi görür.","Allah çok merhametlidir.","Allah her şeyi yaratır."],e:"Samed = muhtaç olmayan, her şeyin O’na muhtaç olduğu."},
+ {q:"“İhlas” kelimesi ne anlama gelir?",o:["Samimiyet, içtenlik","Güç, kuvvet","Sabah vakti","Şükür"],e:"İhlas = samimiyet."},
+ {q:"“Ve lem yekün lehû küfüven ehad” ayetinin anlamı nedir?",o:["Hiçbir şey O’na denk değildir.","O, doğurmamıştır.","De ki: O bir tektir.","Allah her şeyi bilir."],e:"4. ayet."},
+ {q:"Allah’ın bir olduğunu ilk ayet nasıl söyler?",o:["Kul hüvallâhü ehad","Allâhüs-samed","Lem yelid ve lem yûled","Ve lem yekün lehû küfüven ehad"],e:"“De ki: O, Allah’tır, bir tektir.”"},
+ {q:"İhlas suresi Kur’an’ın kaçıncı suresidir?",o:["112.","1.","114.","36."],e:"112. suredir."}
+]}
+};
+
+// ---------- the plan: about an hour a day ----------
+const DAYS=[
+ {d:"2026-11-08",note:"Türkçe is on Tuesday, so start with it. Today is Sunday: go slowly and read the notes first.",tasks:[
+  {set:"tr-yazim",min:20,desc:"Read the notes, then do the quiz"},
+  {set:"tr-yazim-cards",min:5,desc:"Which spelling is right?"},
+  {brk:1,min:5},
+  {set:"tr-anlam",min:15,desc:"Guess word meanings from the sentence"},
+  {set:"din-esma",min:15,desc:"First look at the names; it's fine not to know them yet"}]},
+ {d:"2026-11-09",note:"Tomorrow: Türkçe 09.20 and the listening exam 10.15. Do the Türkçe tasks first.",tasks:[
+  {set:"tr-okuma",min:15,desc:"Reading, key words and pictures"},
+  {set:"tr-dinle",min:10,desc:"Listen carefully, like the real listening exam"},
+  {brk:1,min:5},
+  {set:"fen-gas",min:15,desc:"Cambridge Science: read the notes, then the quiz"},
+  {set:"fen-digest",min:15,desc:"Learn the order of the organs"}]},
+ {d:"2026-11-10",note:"Türkçe is done today. Tomorrow at 11.10: Cambridge Science. (Kültür ve Medeniyetimize Yön Verenler at 09.20 is skipped.)",tasks:[
+  {set:"fen-words",min:10,desc:"All the key words for tomorrow"},
+  {set:"fen-diet",min:15,desc:"Nutrients and their jobs"},
+  {set:"fen-all",min:10,desc:"A mixed test from all three topics"},
+  {brk:1,min:5},
+  {set:"en-nature",min:10,desc:"Start English: Unit 1 words"},
+  {set:"en-verbs",min:10,desc:"Stative and action verbs"}]},
+ {d:"2026-11-11",note:"Tomorrow: English 09.20 and the English listening exam 10.15.",tasks:[
+  {set:"en-past",min:15,desc:"Was reading when … rang"},
+  {set:"en-cond",min:15,desc:"If …, will / would; going to"},
+  {set:"en-dinle",min:10,desc:"Practise for the listening exam"},
+  {brk:1,min:5},
+  {set:"din-duzen",min:15,desc:"Start Din Kültürü for Friday"}]},
+ {d:"2026-11-12",note:"Last study day! Tomorrow: Cambridge English 09.20 and Din Kültürü 10.15.",tasks:[
+  {set:"en-school",min:15,desc:"Cambridge English: rules, likes and the time"},
+  {set:"en-school-words",min:10,desc:"School and classroom words"},
+  {brk:1,min:5},
+  {set:"din-esmaq",min:15,desc:"Which name fits the sentence?"},
+  {set:"din-ihlas",min:15,desc:"Reading, meaning and facts"}]},
+ {d:"2026-11-13",note:"Exam day! Just a short warm-up at breakfast. Good luck! 🍀",tasks:[
+  {set:"en-school-words",min:5,desc:"Quick warm-up for Cambridge English"},
+  {set:"din-esma",min:5,desc:"Quick warm-up for Din Kültürü"}]}
+];
+DAYS.forEach(day=>day.tasks.forEach((t,i)=>t.id=day.d+"#"+i));
+
+// ---------- saved progress (this device only) ----------
+const KEY="yazili:v1";
+let S={done:{},best:{},breakEnd:0};
+try{const x=JSON.parse(localStorage.getItem(KEY)||"null");if(x&&x.done)S=Object.assign(S,x)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+// ---------- helpers ----------
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const WD=["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+const WDs=["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+const MON=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const today=()=>ymd(new Date());
+const daysBetween=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+
+let selDay=(()=>{const t=today();if(DAYS.some(d=>d.d===t))return t;if(t<DAYS[0].d)return DAYS[0].d;return DAYS[DAYS.length-1].d})();
+
+// ---------- header: next exam ----------
+function renderNext(){
+  const t=today(),now=new Date(),hm=pad(now.getHours())+"."+pad(now.getMinutes());
+  const up=EXAMS.filter(e=>!e.skip&&(e.d>t||(e.d===t&&e.t.slice(6)>hm)));
+  const el=$("#next");
+  if(!up.length){el.innerHTML="<b>All exams done! 🎉</b>Time to play.";return}
+  const e=up[0],n=daysBetween(t,e.d);
+  el.innerHTML=`<span class="mute">Next exam</span><b>${esc(e.name)}</b>${n===0?"today":n===1?"tomorrow":"in "+n+" days"} · ${e.t.slice(0,5)}`;
+}
+
+// ---------- plan tab ----------
+function taskInfo(t){
+  if(t.brk)return{s:"brk",title:"Fun break",desc:"Play a game, stretch or have a snack"};
+  const set=SETS[t.set];return{s:set.s,title:set.title,desc:t.desc||""};
+}
+function dayStats(day){const n=day.tasks.length,k=day.tasks.filter(t=>S.done[t.id]).length;return{n,k}}
+function renderDays(){
+  const t=today();
+  $("#days").innerHTML=DAYS.map(day=>{
+    const dt=parse(day.d),{n,k}=dayStats(day);
+    return `<button class="day${day.d===t?" today":""}" aria-pressed="${day.d===selDay}" data-day="${day.d}">
+      <small>${day.d===t?"Bugün":WDs[dt.getDay()]}</small><b>${dt.getDate()}</b><span class="st">${k===n?"★ done":k?"★ "+k+"/"+n:""}</span></button>`}).join("");
+}
+function renderPlan(){
+  renderDays();
+  const day=DAYS.find(d=>d.d===selDay),dt=parse(day.d),{n,k}=dayStats(day);
+  const mins=day.tasks.reduce((a,t)=>a+t.min,0);
+  $("#dayTitle").textContent=`${dt.getDate()} ${MON[dt.getMonth()]} ${WD[dt.getDay()]} · ${mins} min`;
+  $("#dayBar").style.width=(n?k/n*100:0)+"%";
+  const exams=EXAMS.filter(e=>e.d===day.d);
+  $("#dayBanner").innerHTML=`<div class="banner">${exams.length?"<b>Exams today:</b> "+exams.map(e=>esc(e.name)+" ("+e.t+")"+(e.skip?" – skipped":"")).join(", ")+"<br>":""}${esc(day.note)}</div>`;
+  $("#tasks").innerHTML=day.tasks.map(t=>{
+    const i=taskInfo(t),done=!!S.done[t.id],best=t.set&&S.best[t.set]!=null&&SETS[t.set].kind!=="cards"?` · best ${S.best[t.set]}%`:"";
+    return `<div class="task${done?" done":""}" style="--c:${SUBJ[i.s].c}">
+      <button class="chk" data-check="${t.id}" aria-label="${done?"Mark not done":"Mark done"}"></button>
+      <div class="body"><div class="sub">${SUBJ[i.s].name} · ${t.min} min${best}</div><h3>${esc(i.title)}</h3><p>${esc(i.desc)}</p></div>
+      <button class="go" data-open="${t.brk?"break":t.set}" data-task="${t.id}">${t.brk?"Break":done?"Again":"Start"}</button></div>`}).join("");
+}
+
+// ---------- practice tab ----------
+function renderPractice(){
+  const order=["tr","fen","en","din"];
+  $("#tab-practice").innerHTML=`<p class="mute">Everything in the plan, plus extras. Do any of them as often as you like.</p>`+order.map(s=>{
+    const ids=Object.keys(SETS).filter(id=>SETS[id].s===s);
+    return `<div class="group" style="--c:${SUBJ[s].c}"><h2>${SUBJ[s].name}</h2><div class="sets">${ids.map(id=>{const x=SETS[id];
+      const kind=x.kind==="cards"?"Flashcards · "+x.cards.length:x.kind==="listen"?"Listening · "+x.qs.length+" questions":"Quiz · "+(x.mix?x.n:x.qs.length)+" questions";
+      return `<button class="set" style="--c:${SUBJ[s].c}" data-open="${id}"><b>${esc(x.title)}</b><span>${kind}${S.best[id]!=null&&x.kind!=="cards"?" · best "+S.best[id]+"%":""}</span></button>`}).join("")}</div></div>`}).join("");
+}
+
+// ---------- exams tab ----------
+function renderExams(){
+  const t=today();
+  $("#tab-exams").innerHTML=EXAMS.map(e=>{
+    const dt=parse(e.d),n=daysBetween(t,e.d),past=n<0;
+    const tag=e.skip?'<span class="tag">skipped</span>':past?'<span class="tag">done</span>':n===0?'<span class="tag cd">today</span>':n===1?'<span class="tag cd">tomorrow</span>':`<span class="tag">${n} days</span>`;
+    return `<div class="exam${past||e.skip?" past":""}" style="--c:${SUBJ[e.s].c}"><div class="when"><b>${dt.getDate()} ${MON[dt.getMonth()]}</b><span>${WD[dt.getDay()]}</span></div>
+      <div><h3>${esc(e.name)}${tag}</h3><p>${e.t}</p></div></div>`}).join("")+
+    `<div class="donelist"><b>✓ Already done:</b> ${DONE_ALREADY.map(esc).join(", ")}.<br><span class="mute">Görsel Sanatlar, Müzik and the other lessons are assessed in their own class periods.</span></div>`;
+}
+
+// ---------- tabs ----------
+document.querySelector(".tabs").addEventListener("click",e=>{
+  const b=e.target.closest("[data-tab]");if(!b)return;
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  ["plan","practice","exams"].forEach(n=>$("#tab-"+n).hidden=n!==b.dataset.tab);
+  if(b.dataset.tab==="practice")renderPractice();
+  if(b.dataset.tab==="exams")renderExams();
+});
+document.addEventListener("click",e=>{
+  const d=e.target.closest("[data-day]");if(d){selDay=d.dataset.day;renderPlan();return}
+  const c=e.target.closest("[data-check]");if(c){const id=c.dataset.check;S.done[id]=!S.done[id];if(!S.done[id])delete S.done[id];save();renderPlan();return}
+  const o=e.target.closest("[data-open]");if(o){openActivity(o.dataset.open,o.dataset.task||null)}
+});
+
+// ---------- activity sheet ----------
+let curTask=null,cleanup=null;
+const body=()=>$("#sheetBody");
+function openSheet(title,s){
+  $("#sheet").style.setProperty("--c",SUBJ[s].c);$("#sheetTitle").textContent=title;
+  $("#sheet").hidden=false;document.body.style.overflow="hidden";$("#sheet").scrollTop=0;
+}
+function closeSheet(){
+  if(cleanup){cleanup();cleanup=null}
+  $("#sheet").hidden=true;document.body.style.overflow="";curTask=null;renderPlan();renderNext();
+  if(!$("#tab-practice").hidden)renderPractice();
+}
+$("#sheetClose").onclick=closeSheet;
+function finishTask(){if(curTask){S.done[curTask]=true;save()}}
+
+function openActivity(id,taskId){
+  curTask=taskId;
+  if(id==="break")return openBreak();
+  const set=SETS[id];openSheet(set.title,set.s);
+  if(set.kind==="cards")return runCards(id,set);
+  if(set.kind==="listen")return runListen(id,set);
+  if(set.notes){
+    body().innerHTML=`<div class="notes">${set.notes}</div><div class="row center"><button class="btn" id="startQ">Start the quiz →</button></div>`;
+    $("#startQ").onclick=()=>{$("#sheet").scrollTop=0;runQuiz(id,set)};
+  } else runQuiz(id,set);
+}
+
+// quiz
+function quizQuestions(set){
+  if(set.mix){const all=set.mix.flatMap(m=>SETS[m].qs);return shuffle(all).slice(0,set.n)}
+  return set.qs.slice();
+}
+function runQuiz(id,set,only){
+  const qs=only||quizQuestions(set);let i=0,score=0;const wrong=[];
+  const show=()=>{
+    if(i>=qs.length)return end();
+    const q=qs[i],opts=shuffle(q.o.map((t,k)=>({t,ok:k===0})));
+    body().innerHTML=`<div class="progress">Question ${i+1} of ${qs.length} · ${score} right</div>
+      ${q.p?`<div class="passage">${esc(q.p)}</div>`:""}${q.v?`<div class="visual">${q.v}</div>`:""}
+      <div class="q">${q.q}</div><div class="opts">${opts.map((o,k)=>`<button class="opt" data-k="${k}">${esc(o.t)}</button>`).join("")}</div><div id="fb"></div>`;
+    body().querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+      const k=+b.dataset.k,ok=opts[k].ok;
+      body().querySelectorAll(".opt").forEach((x,j)=>{x.disabled=true;if(opts[j].ok)x.classList.add("right")});
+      if(ok)score++;else{b.classList.add("wrong");wrong.push(q)}
+      $("#fb").innerHTML=`<div class="feedback ${ok?"ok":"no"}">${ok?"✓ Right!":"✗ Not quite."} ${esc(q.e||"")}</div>
+        <div class="row" style="margin-top:12px"><button class="btn" id="nx">${i+1<qs.length?"Next →":"See score"}</button></div>`;
+      $("#nx").onclick=()=>{i++;show();$("#sheet").scrollTop=0};$("#nx").focus();
+    });
+  };
+  const end=()=>{
+    const pct=Math.round(score/qs.length*100);
+    if(!only){S.best[id]=Math.max(S.best[id]||0,pct)}
+    finishTask();save();
+    const msg=pct===100?"Perfect! 🌟":pct>=80?"Great job! 💪":pct>=50?"Good — look at the ones you missed.":"Read the notes again and try once more.";
+    body().innerHTML=`<div class="result"><div class="big">${score}/${qs.length}</div><p>${msg}</p></div>
+      <div class="row center">${wrong.length?'<button class="btn" id="rw">Try my mistakes again</button>':""}
+      <button class="btn quiet" id="ra">Do it all again</button>${set.notes?'<button class="btn quiet" id="rn">Read the notes</button>':""}<button class="btn quiet" id="cl">Finish</button></div>`;
+    if(wrong.length)$("#rw").onclick=()=>runQuiz(id,set,shuffle(wrong));
+    $("#ra").onclick=()=>runQuiz(id,set);
+    if(set.notes)$("#rn").onclick=()=>openActivity(id,curTask);
+    $("#cl").onclick=closeSheet;
+  };
+  show();
+}
+
+// flashcards: cards you miss come back until you know them all
+function runCards(id,set){
+  let deck=shuffle(set.cards),known=0;const total=deck.length;
+  const show=()=>{
+    if(!deck.length){finishTask();
+      body().innerHTML=`<div class="result"><div class="big">${total}/${total}</div><p>You know all the cards! 🌟</p></div>
+        <div class="row center"><button class="btn quiet" id="ra">Go again</button><button class="btn" id="cl">Finish</button></div>`;
+      $("#ra").onclick=()=>runCards(id,set);$("#cl").onclick=closeSheet;return}
+    const c=deck[0];
+    body().innerHTML=`<div class="progress">Known ${known} of ${total} · ${deck.length} left</div>
+      <div class="card3d" id="cd" role="button" tabindex="0" aria-label="Flip card"><div class="flip" id="fl"><div class="face f">${esc(c.f)}</div><div class="face b">${c.b}</div></div></div>
+      <p class="hint">Tap the card to flip it. Say the answer out loud first!</p>
+      <div class="row center"><button class="btn quiet" id="ag">↻ Again later</button><button class="btn" id="kn">✓ I knew it</button></div>`;
+    const flip=()=>$("#fl").classList.toggle("on");
+    $("#cd").onclick=flip;$("#cd").onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();flip()}};
+    $("#kn").onclick=()=>{deck.shift();known++;show()};
+    $("#ag").onclick=()=>{deck.push(deck.shift());if(deck.length>1){const c2=deck.pop();deck.splice(Math.min(3,deck.length),0,c2)}show()};
+  };
+  show();
+}
+
+// listening: the device reads the text aloud, then questions
+function runListen(id,set){
+  let plays=0;const can="speechSynthesis" in window;
+  const pickVoice=()=>{const vs=speechSynthesis.getVoices(),l=set.lang.toLowerCase(),base=l.slice(0,2);
+    return vs.find(v=>v.lang.toLowerCase().replace("_","-")===l)||vs.find(v=>v.lang.toLowerCase().startsWith(base))||null};
+  const speak=()=>{
+    if(!can)return;speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(set.text);u.lang=set.lang;u.rate=.9;const v=pickVoice();if(v)u.voice=v;
+    u.onstart=()=>$("#pl")&&($("#pl").textContent="⏸");u.onend=()=>$("#pl")&&($("#pl").textContent="▶");
+    speechSynthesis.speak(u);plays++;$("#pc")&&($("#pc").textContent=`Played ${plays} time${plays>1?"s":""}. In the real exam you usually hear it twice.`);
+  };
+  if(can){speechSynthesis.getVoices();cleanup=()=>speechSynthesis.cancel()}
+  body().innerHTML=`<div class="notes"><h3>How it works</h3><p>Press play and listen <b>without reading</b>. You can take notes on paper: names, places, numbers. Then answer the questions.</p></div>
+    ${can?`<button class="play" id="pl" aria-label="Play">▶</button><p class="hint" id="pc">Turn the sound on, then press play.</p>`:
+    `<p class="hint">This device can't read aloud. Ask someone to read this text to you twice:</p><div class="passage">${esc(set.text)}</div>`}
+    <div class="row center"><button class="btn" id="go">I'm ready – questions →</button></div>`;
+  if(can)$("#pl").onclick=()=>{if(speechSynthesis.speaking){speechSynthesis.cancel();$("#pl").textContent="▶"}else speak()};
+  $("#go").onclick=()=>{if(can)speechSynthesis.cancel();runQuiz(id,set);
+    // after the quiz, offer the text
+    const obs=new MutationObserver(()=>{if(body().querySelector(".result")&&!body().querySelector("#txt")){obs.disconnect();
+      body().insertAdjacentHTML("beforeend",`<div class="notes" id="txt" style="margin-top:18px"><h3>The text</h3><p>${esc(set.text)}</p></div>`)}});
+    obs.observe(body(),{childList:true});const prev=cleanup;cleanup=()=>{obs.disconnect();if(prev)prev()};
+  };
+}
+
+// break: five minutes, then back to work
+function openBreak(){
+  openSheet("Fun break","brk");
+  const task=curTask;
+  // a break that is still running (you went to play and came back) keeps its time
+  if(!S.breakEnd||S.breakEnd<Date.now()){S.breakEnd=Date.now()+5*60e3;save()}
+  body().innerHTML=`<div class="timer" id="tm">5:00</div><p class="hint" id="tmh">Five minutes. When the timer ends, come back for the next task!</p>
+    <div class="games">
+      <a href="../snake.html"><span>🐍</span>Neon Snake Rush</a><a href="../stack.html"><span>🧱</span>Tower Stack</a>
+      <a href="../dodger.html"><span>🚀</span>Space Dodger</a><a href="../words.html"><span>🔎</span>Word Detective</a></div>
+    <div class="notes"><h3>Or no screen:</h3><ul><li>🤸 10 jumping jacks and a big stretch</li><li>💧 Drink a glass of water</li><li>🍎 Eat some fruit</li><li>👀 Look out of the window for 20 seconds to rest your eyes</li></ul></div>
+    <div class="row center"><button class="btn" id="bd">I'm back – break done</button></div>`;
+  const tick=()=>{const left=Math.max(0,S.breakEnd-Date.now()),m=Math.floor(left/6e4),s=Math.floor(left%6e4/1e3);
+    const el=$("#tm");if(!el)return;el.textContent=m+":"+pad(s);if(!left){$("#tmh").textContent="Time's up! Back to studying 📚";clearInterval(iv)}};
+  const iv=setInterval(tick,500);tick();cleanup=()=>clearInterval(iv);
+  body().querySelectorAll(".games a").forEach(a=>a.onclick=()=>{if(task){S.done[task]=true;save()}});
+  $("#bd").onclick=()=>{S.breakEnd=0;if(task){S.done[task]=true}save();closeSheet()};
+}
+
+// ---------- start ----------
+renderNext();renderPlan();
+setInterval(renderNext,60e3);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#sheet").hidden)closeSheet()});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});
+})();
+</script>
+</body>
+</html>
